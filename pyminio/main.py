@@ -1,14 +1,13 @@
 import os
 import re
-from datetime import datetime
-from io import StringIO
-from collections import namedtuple
-from os.path import normpath, join, basename
-
-
 import pytz
 from minio import Minio
+from io import StringIO
+from typing import List, Dict, Union
+from datetime import datetime
 from attrdict import AttrDict
+from collections import namedtuple
+from os.path import join, basename
 from minio.error import NoSuchKey, BucketNotEmpty
 
 ROOT = "/"
@@ -20,17 +19,15 @@ Match = namedtuple('Match', ['bucket', 'prefix', 'filename'])
 
 
 def _validate_directory(func):
-    def decorated_method(self, path, *args, **kwargs):
+    def decorated_method(self, path: str, *args, **kwargs):
         if path != ROOT:
             match = self.PATH_STRUCTURE.match(path)
             if match is None:
                 raise ValueError(f'{path} is not a valid path')
 
             if match.group('filename') is not None:
-                raise ValueError(
-                    f"{path} is not a valid directory path. must be absolute and"
-                    " end with /"
-                )
+                raise ValueError(f"{path} is not a valid directory path."
+                                 " must be absolute and end with /")
 
         return func(self, path, *args, **kwargs)
 
@@ -49,12 +46,13 @@ def get_creation_date(obj):
     return obj.creation_date
 
 
-class ObjectStorage(object):
+class Pyminio:
     # get from file
     PATH_STRUCTURE = \
         re.compile(r"/(?P<bucket>.*?)/(?P<prefix>.*/)?(?P<filename>.+[^/])?")
 
-    ENDPOINT = os.environ.get('MINIO_CONNECTION')  # for example "localhost:9000"
+    ENDPOINT = os.environ.get('MINIO_CONNECTION')
+    # for example "localhost:9000"
     ACCESS_KEY = os.environ.get('MINIO_ACCESS_KEY')
     SECRET_KEY = os.environ.get('MINIO_SECRET_KEY')
 
@@ -70,12 +68,12 @@ class ObjectStorage(object):
                                secret_key=self._secret_key,
                                secure=False)
 
-    def _get_match(self, path):
+    def _get_match(self, path: str) -> Match:
         """Get the bucket name, path prefix and file's name from path.
 
         Returns:
-            tuple(str, str, str) ->
-                bucket name, path without filename and bucket name, file's name
+            Match. bucket name, path without filename and bucket name,
+                   file's name
         """
         if path == ROOT:
             return Match(bucket='', prefix=None, filename=None)
@@ -89,7 +87,7 @@ class ObjectStorage(object):
                      filename=match.group("filename"))
 
     @_validate_directory
-    def mkdirs(self, path):
+    def mkdirs(self, path: str):
         bucket, directory_path, _ = self._get_match(path)
 
         if bucket == '':
@@ -109,7 +107,7 @@ class ObjectStorage(object):
                                   object_name=directory_path,
                                   data=empty_file, length=0)
 
-    def _get_objects_at(self, bucket, directory_path):
+    def _get_objects_at(self, bucket: str, directory_path: str):
         return sorted(self.minio_obj.list_objects(bucket_name=bucket,
                                                   prefix=directory_path),
                       key=get_last_modified, reverse=True)
@@ -119,7 +117,8 @@ class ObjectStorage(object):
                       key=get_creation_date, reverse=True)
 
     @classmethod
-    def _get_relative_path(cls, directory_path, file_name):
+    def _get_relative_path(cls, directory_path: str, file_name: str):
+        # TODO: write this better
         if directory_path is None:
             if file_name is None:
                 return ''
@@ -132,7 +131,7 @@ class ObjectStorage(object):
         return join(directory_path, file_name)
 
     @classmethod
-    def _extract_metadata(cls, detailed_metadata):
+    def _extract_metadata(cls, detailed_metadata: Dict):
         """Remove 'X-Amz-Meta-' from al the keys, and lowercase them.
             When metadata is pushed in the minio, the minio is adding
             those details that screw us. this is an unscrewing function.
@@ -141,13 +140,13 @@ class ObjectStorage(object):
                 for key, value in detailed_metadata.items()}
 
     @_validate_directory
-    def listdir(self, path, only_files=False):
+    def listdir(self, path: str, only_files: bool = False) -> List[str]:
         """Return all files and directories absolute paths
             within the directory path.
 
         Args:
-            path(str): path of a directory.
-            only_files(bool): return only files name and not directories.
+            path: path of a directory.
+            only_files: return only files name and not directories.
 
         Returns:
             list. files and directories in path.
@@ -167,11 +166,7 @@ class ObjectStorage(object):
                 for obj in self._get_objects_at(bucket, directory_path)
                 if not only_files or not obj.is_dir]
 
-    def isdir(self, path):
-        _, _, filename = self._get_match(path)
-        return self.exists(path) and filename is None
-
-    def exists(self, path):
+    def exists(self, path: str):
         bucket, directory_path, filename = self._get_match(path)
 
         if bucket == '':
@@ -182,6 +177,7 @@ class ObjectStorage(object):
             return False
 
         relative_path = self._get_relative_path(directory_path, filename)
+
         try:
             self.minio_obj.get_object(bucket, relative_path)
 
@@ -190,8 +186,12 @@ class ObjectStorage(object):
 
         return True
 
+    def isdir(self, path: str):
+        _, _, filename = self._get_match(path)
+        return self.exists(path) and filename is None
+
     @_validate_directory
-    def rmdir(self, path, recursive=False):
+    def rmdir(self, path: str, recursive: bool = False):
         bucket, directory_path, _ = self._get_match(path)
 
         if bucket == '':
@@ -225,7 +225,7 @@ class ObjectStorage(object):
         else:
             self.minio_obj.remove_object(bucket, directory_path)
 
-    def rm(self, path, recursive=False):
+    def rm(self, path: str, recursive: bool = False):
         if recursive:
             return self.rmdir(path, recursive=True)
 
@@ -238,7 +238,7 @@ class ObjectStorage(object):
         relative_path = self._get_relative_path(directory_path, filename)
         self.minio_obj.remove_object(bucket, relative_path)
 
-    def cp(self, from_path, to_path):
+    def cp(self, from_path: str, to_path: str):
         if self.isdir(from_path):
             raise NotImplementedError("currently not supported")
 
@@ -260,11 +260,11 @@ class ObjectStorage(object):
                                    join(from_bucket,
                                         relative_from_path))
 
-    def mv(self, from_path, to_path):
+    def mv(self, from_path: str, to_path: str):
         self.cp(from_path, to_path)
         self.rm(from_path)
 
-    def get(self, path):
+    def get(self, path: str):
         bucket, directory_path, filename = self._get_match(path)
         relative_path = self._get_relative_path(directory_path, filename)
 
@@ -288,10 +288,11 @@ class ObjectStorage(object):
             raise RuntimeError(f"cannot access {path}: "
                                "No such file or directory")
 
-    def put_data(self, path, data, metadata=None):
+    def put_data(self, path: str, data: Union[str, File],
+                 metadata: Dict = None):
         bucket, prefix, filename = self._get_match(path)
         data_file = data
-        if isinstance(data, basestring):
+        if isinstance(data, str):
             data_file = StringIO()
             data_file.write(data)
 
@@ -304,7 +305,7 @@ class ObjectStorage(object):
                                   metadata=file_metadata)
         data_file.close()
 
-    def put_file(self, path, file_path, metadata=None):
+    def put_file(self, path: str, file_path: str, metadata: Dict = None):
         bucket, prefix, filename = self._get_match(path)
 
         if filename is None:
@@ -318,8 +319,8 @@ class ObjectStorage(object):
                                    file_path, metadata=file_metadata)
 
     @classmethod
-    def _get_metadata(cls, file_pointer, metadata):
-        file_metadata = {}  #TODO: review this.
+    def _get_metadata(cls, file_pointer: File, metadata: Dict):
+        file_metadata = {}  # TODO: review this.
 
         if metadata is not None:
             file_metadata.update(metadata)
@@ -327,7 +328,7 @@ class ObjectStorage(object):
         return file_metadata
 
     @_validate_directory
-    def get_last_object(self, path):
+    def get_last_object(self, path: str):
         bucket, directory_path, _ = self._get_match(path)
         objects_names_in_dir = self.listdir(path, only_files=True)
         if len(objects_names_in_dir) == 0:
