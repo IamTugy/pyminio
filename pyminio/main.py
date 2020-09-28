@@ -1,13 +1,14 @@
 import re
-import pytz
 
-from io import BytesIO
 from os import environ
+from io import BytesIO
 from datetime import datetime
 from dataclasses import dataclass
 from collections import namedtuple
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Any
 from os.path import join, basename, dirname, normpath
+
+import pytz
 
 from minio import Minio
 from attrdict import AttrDict
@@ -20,19 +21,19 @@ PATH_STRUCTURE = \
 
 
 @dataclass
-class object_data:
+class ObjectData:
     name: str
     full_path: str
-    metadata: Dict
+    metadata: Dict[str, Any]
 
 
 @dataclass
-class File(object_data):
+class File(ObjectData):
     data: bytes
 
 
 @dataclass
-class Folder(object_data):
+class Folder(ObjectData):
     pass
 
 
@@ -313,10 +314,36 @@ class Pyminio:
         relative_path = self._get_relative_path(directory_path, filename)
         self.minio_obj.remove_object(bucket, relative_path)
 
+    # def _copy_directory(self, from_path: str, to_path: str):
+    #     objects = self.get_objects_at(from_path)
+    #     files = []
+    #     directories = []
+    #     for obj in objects:
+    #         if obj.is_dir:
+    #             directories.append(obj)
+    #         else:
+    #             files.append(obj)
+    #     if directories == []:
+    #         pass  # make path
+    #         # self.mkdirs(join(to_path, dirname(from_path), ''))
+    #     else:
+    #         #  recursive run with next directories
+    #         for directory in directories:
+    #             self._copy_directory(
+    #                 from_path=,
+    #                 to_path=join(to_path, basename(directory))
+    #     for file_to_copy in files:
+    #         #  create file
+
     def cp(self, from_path: str, to_path: str, recursive: bool = False):
         """Copy files from one directory to another.
 
-            Works like linux's cp.
+            If to_path will be a path to a dictionary, the name will be
+            the copied file name. if it will be a path with a file name,
+            the name of the file will be this file's name.
+
+
+            Works like linux's cp (-r).
 
         Args:
             from_path: source path to a file.
@@ -327,8 +354,8 @@ class Pyminio:
             from_path
         )
 
-        if from_filename is None:
-            raise RuntimeError("cannot copy folder, currently unsupported")
+        if from_filename is None and not recursive:
+            raise RuntimeError("cannot copy folder unrecursively")
 
         to_bucket, to_directory_path, to_filename = extract_match(to_path)
 

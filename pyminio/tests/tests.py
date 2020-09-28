@@ -1,7 +1,8 @@
 from os.path import join
+
 import pytest
 
-from pyminio import PyminioTest
+from .utils import PyminioTest
 
 ROOT = '/'
 FILE_CONTENT = bytes('test', 'UTF-8')
@@ -280,6 +281,20 @@ def test_cp(client):
     assert client.exists('/foo/bar1/bar2/baz')
 
 
+@pytest.mark.skip()
+@mkdirs_recursively(
+    tree={
+        'foo': {
+            'bar1': [],
+            'baz': None,
+            'bar2': [],
+        }
+    }
+)
+def test_mv(client):
+    pass  # like cp but check if not exists afterwards
+
+
 @mkdirs_recursively(
     tree={
         'foo': {
@@ -292,8 +307,6 @@ def test_cp(client):
 )
 def test_get_last_object(client):
     client.put_data('/foo/bar4', FILE_CONTENT)
-    last_object = client.get_last_object('/foo/')
-    assert last_object.name == 'bar4'
+    assert client.get_last_object('/foo/').name == 'bar4'
 
-    last_object = client.get_last_object('/baz/')
-    assert last_object is None
+    assert client.get_last_object('/baz/') is None
