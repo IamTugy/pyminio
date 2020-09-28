@@ -1,12 +1,12 @@
-import os
 import re
 import pytz
+
 from io import BytesIO
+from os import environ
 from datetime import datetime
 from dataclasses import dataclass
 from collections import namedtuple
 from typing import List, Dict, Union
-from pathlib import Path
 from os.path import join, basename, dirname, normpath
 
 from minio import Minio
@@ -92,10 +92,10 @@ def get_creation_date(obj):
 
 
 class Pyminio:
-    ENDPOINT = os.environ.get('MINIO_CONNECTION')
+    ENDPOINT = environ.get('MINIO_CONNECTION')
     # for example "localhost:9000"
-    ACCESS_KEY = os.environ.get('MINIO_ACCESS_KEY')
-    SECRET_KEY = os.environ.get('MINIO_SECRET_KEY')
+    ACCESS_KEY = environ.get('MINIO_ACCESS_KEY')
+    SECRET_KEY = environ.get('MINIO_SECRET_KEY')
 
     def __init__(self, endpoint=None, access_key=None,
                  secret_key=None, minio_client=Minio):
@@ -147,6 +147,16 @@ class Pyminio:
         return sorted(self.minio_obj.list_objects(bucket_name=bucket,
                                                   prefix=directory_path),
                       key=get_last_modified, reverse=True)
+
+    @_validate_directory
+    def get_objects_at(self, path: str):
+        """Return all objects in the specified path.
+
+        Args:
+            path: path of a directory.
+        """
+        bucket, directory_path, _ = extract_match(path)
+        return self._get_objects_at(bucket, directory_path)
 
     def _get_buckets(self):
         """Return all existed buckets. """
@@ -301,17 +311,12 @@ class Pyminio:
 
         bucket, directory_path, filename = extract_match(path)
         relative_path = self._get_relative_path(directory_path, filename)
-        self.minio_obj.remove_object(bucket, relative_path)        
+        self.minio_obj.remove_object(bucket, relative_path)
 
     def cp(self, from_path: str, to_path: str, recursive: bool = False):
         """Copy files from one directory to another.
 
-            If to_path will be a path to a dictionary, the name will be
-            the copied file name. if it will be a path with a file name,
-            the name of the file will be this file's name.
-
-
-            Works like linux's cp (-r).
+            Works like linux's cp.
 
         Args:
             from_path: source path to a file.

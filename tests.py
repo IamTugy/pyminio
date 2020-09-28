@@ -38,11 +38,7 @@ def mkdirs_recursively(tree, relative_path=ROOT):
 
 @pytest.fixture
 def client():
-    client = PyminioTest(
-        endpoint="localhost:9000",
-        access_key="***REMOVED***",
-        secret_key="***REMOVED***"
-    )
+    client = PyminioTest()
     yield client
     client.rm('/', recursive=True)
 
