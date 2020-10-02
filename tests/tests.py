@@ -8,8 +8,8 @@ ROOT = '/'
 FILE_CONTENT = bytes('test', 'UTF-8')
 
 
-def _mkdirs_recursively(client, tree, relative_path):
-    for key, value in tree.items():
+def _mkdirs_recursively(client, fs, relative_path):
+    for key, value in fs.items():
         abspath = join(relative_path, key)
         if value is None:
             client.mkdirs(join(relative_path, ''))
@@ -21,16 +21,16 @@ def _mkdirs_recursively(client, tree, relative_path):
         else:
             _mkdirs_recursively(
                 client=client,
-                tree=tree[key],
+                fs=fs[key],
                 relative_path=abspath)
 
 
-def mkdirs_recursively(tree, relative_path=ROOT):
+def mock_fs(fs, relative_path=ROOT):
     def decorator(func):
         def wrapper(client):
             _mkdirs_recursively(
                 client=client,
-                tree=tree,
+                fs=fs,
                 relative_path=relative_path)
             return func(client)
         return wrapper
@@ -44,15 +44,13 @@ def client():
     client.rm('/', recursive=True)
 
 
-@mkdirs_recursively(
-    tree={
-        'foo': {
-            'bar': {
-                'baz': None
-            }
+@mock_fs({
+    'foo': {
+        'bar': {
+            'baz': None
         }
     }
-)
+})
 def test_exists(client):
     assert client.exists('/foo/')
     assert not client.exists('/foo')
@@ -63,47 +61,41 @@ def test_exists(client):
 
 
 @pytest.mark.skip()
-@mkdirs_recursively(
-    tree={
-        'foo': {
-            'bar': None
-        }
+@mock_fs({
+    'foo': {
+        'bar': None
     }
-)
+})
 def test_put_data(client):
     assert client.exists('/foo/bar')
 
 
 @pytest.mark.skip()
-@mkdirs_recursively(
-    tree={
-        'foo': {
-            'bar': None
-        }
+@mock_fs({
+    'foo': {
+        'bar': None
     }
-)
+})
 def test_put_file(client):
     assert client.exists('/foo/bar')
 
 
-@mkdirs_recursively(
-    tree={
-        'foo1': {
-            'bar': [],
-        },
-        'foo2': {
-            'bar': {
-                'baz': None,
-            }
-        },
-        'foo3': {
-            'bar': {
-                'baz1': [],
-                'baz2': [],
-            }
-        },
-    }
-)
+@mock_fs({
+    'foo1': {
+        'bar': [],
+    },
+    'foo2': {
+        'bar': {
+            'baz': None,
+        }
+    },
+    'foo3': {
+        'bar': {
+            'baz1': [],
+            'baz2': [],
+        }
+    },
+})
 def test_listdir(client):
     assert client.listdir('/').sort() == ['foo1/', 'foo2/', 'foo3/'].sort()
     assert client.listdir('/foo1/') == ['bar/']
@@ -112,25 +104,23 @@ def test_listdir(client):
     assert client.listdir('/foo3/bar/').sort() == ['baz1/', 'baz2/'].sort()
 
 
-@mkdirs_recursively(
-    tree={
-        'foo1': {
-            'bar': [],
-        },
-        'foo2': {
-            'bar': {
-                'baz1': [],
-                'baz2': None,
-            }
-        },
-        'foo3': {
-            'bar': {
-                'baz1': [],
-                'baz2': [],
-            }
+@mock_fs({
+    'foo1': {
+        'bar': [],
+    },
+    'foo2': {
+        'bar': {
+            'baz1': [],
+            'baz2': None,
+        }
+    },
+    'foo3': {
+        'bar': {
+            'baz1': [],
+            'baz2': [],
         }
     }
-)
+})
 def test_listdir_only_files(client):
     assert client.listdir('/', only_files=True) == []
     assert client.listdir('/foo1/', only_files=True) == []
@@ -139,40 +129,36 @@ def test_listdir_only_files(client):
     assert client.listdir('/foo3/bar/', only_files=True) == []
 
 
-@mkdirs_recursively(
-    tree={
-        'foo': {
-            'bar': {
-                'baz': None
-            }
+@mock_fs({
+    'foo': {
+        'bar': {
+            'baz': None
         }
     }
-)
+})
 def test_isdir(client):
     assert client.isdir('/foo/')
     assert client.isdir('/foo/bar/')
     assert not client.isdir('/foo/bar/baz')
 
 
-@mkdirs_recursively(
-    tree={
-        'foo1': {
-            'bar': [],
-        },
-        'foo2': {
-            'bar': {
-                'baz1': [],
-                'baz2': None,
-            }
-        },
-        'foo3': {
-            'bar': {
-                'baz1': [],
-                'baz2': [],
-            }
+@mock_fs({
+    'foo1': {
+        'bar': [],
+    },
+    'foo2': {
+        'bar': {
+            'baz1': [],
+            'baz2': None,
+        }
+    },
+    'foo3': {
+        'bar': {
+            'baz1': [],
+            'baz2': [],
         }
     }
-)
+})
 def test_rmdir(client):
     client.rmdir('/foo1/bar/')
     assert not client.exists('/foo1/bar/')
@@ -191,25 +177,23 @@ def test_rmdir(client):
     assert not client.exists('/foo1/')
 
 
-@mkdirs_recursively(
-    tree={
-        'foo1': {
-            'bar': [],
-        },
-        'foo2': {
-            'bar': {
-                'baz1': [],
-                'baz2': None,
-            }
-        },
-        'foo3': {
-            'bar': {
-                'baz1': [],
-                'baz2': [],
-            }
+@mock_fs({
+    'foo1': {
+        'bar': [],
+    },
+    'foo2': {
+        'bar': {
+            'baz1': [],
+            'baz2': None,
+        }
+    },
+    'foo3': {
+        'bar': {
+            'baz1': [],
+            'baz2': [],
         }
     }
-)
+})
 def test_rm(client):
     client.rm('/foo1/bar/')
     assert not client.exists('/foo1/bar/')
@@ -229,13 +213,11 @@ def test_rm(client):
     assert not client.exists('/foo1/')
 
 
-@mkdirs_recursively(
-    tree={
-        'foo': {
-            'bar': None
-        }
+@mock_fs({
+    'foo': {
+        'bar': None
     }
-)
+})
 def test_get_data(client):
     file_obj = client.get('/foo/bar')
     assert file_obj.name == 'bar'
@@ -243,16 +225,14 @@ def test_get_data(client):
     assert file_obj.data == FILE_CONTENT
 
 
-@mkdirs_recursively(
-    tree={
-        'foo': {
-            'bar1': [],
-            'bar2': {
-                'baz': [],
-            },
-        }
+@mock_fs({
+    'foo': {
+        'bar1': [],
+        'bar2': {
+            'baz': [],
+        },
     }
-)
+})
 def test_get_folder(client):
     folder_obj1 = client.get('/foo/bar1/')
     assert folder_obj1.name == 'bar1/'
@@ -264,15 +244,13 @@ def test_get_folder(client):
 
 
 @pytest.mark.skip()
-@mkdirs_recursively(
-    tree={
-        'foo': {
-            'bar1': [],
-            'baz': None,
-            'bar2': [],
-        }
+@mock_fs({
+    'foo': {
+        'bar1': [],
+        'baz': None,
+        'bar2': [],
     }
-)
+})
 def test_cp(client):
     client.cp('/foo/baz', '/foo/bar2/')
     assert client.exists('/foo/bar2/baz')
@@ -282,29 +260,25 @@ def test_cp(client):
 
 
 @pytest.mark.skip()
-@mkdirs_recursively(
-    tree={
-        'foo': {
-            'bar1': [],
-            'baz': None,
-            'bar2': [],
-        }
+@mock_fs({
+    'foo': {
+        'bar1': [],
+        'baz': None,
+        'bar2': [],
     }
-)
+})
 def test_mv(client):
     pass  # like cp but check if not exists afterwards
 
 
-@mkdirs_recursively(
-    tree={
-        'foo': {
-            'bar1': None,
-            'bar2': None,
-            'bar3': None,
-        },
-        'baz': [],
-    }
-)
+@mock_fs({
+    'foo': {
+        'bar1': None,
+        'bar2': None,
+        'bar3': None,
+    },
+    'baz': [],
+})
 def test_get_last_object(client):
     client.put_data('/foo/bar4', FILE_CONTENT)
     assert client.get_last_object('/foo/').name == 'bar4'
