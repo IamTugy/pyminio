@@ -1,17 +1,21 @@
+from __future__ import annotations
+
 import re
 
 from os import environ
 from io import BytesIO
 from datetime import datetime
 from dataclasses import dataclass
-from typing import List, Dict, Union, Any
+from typing import List, Dict, Any, Tuple
 from os.path import join, basename, dirname, normpath
 
 import pytz
-
+from cached_property import cached_property
 from minio import Minio, definitions
 from attrdict import AttrDict
 from minio.error import NoSuchKey, BucketNotEmpty
+
+from .exceptions import DirectoryNotEmptyError
 
 ROOT = "/"
 
@@ -37,30 +41,41 @@ class Match:
     PATH_STRUCTURE = \
         re.compile(r"/(?P<bucket>.*?)/+(?P<prefix>.*/+)?(?P<filename>.+[^/])?")
 
-    def extract_match(self) -> List[str]:
-        """Get the bucket name, path prefix and file's name from path.
+    def __init__(self, path: str):
+        self._path = path
+        self._match = self._get_match()
 
-        Returns:
-            Match. bucket name, path without filename and bucket name,
-                file's name.
-        """
-        if self.path == ROOT:
-            return ('', '', '')
+    @cached_property
+    def path(self):
+        return re.sub(r'/+', r'/', self._path)
+
+    @property
+    def bucket(self):
+        return self._match.bucket
+
+    @property
+    def prefix(self):
+        return self._match.prefix
+
+    @property
+    def filename(self):
+        return self._match.filename
+
+    def _get_match(self) -> AttrDict:
+        """Get the bucket name, path prefix and file's name from path."""
+        if self.is_root():
+            return AttrDict(bucket='', prefix='', filename='')
 
         match = self.PATH_STRUCTURE.match(self.path)
 
         if match is None:
             raise ValueError(f'{self.path} is not a valid path')
 
-        return (
-            match.group("bucket"),
-            match.group("prefix") or '',
-            match.group("filename") or '',
+        return AttrDict(
+            bucket=match.group("bucket"),
+            prefix=match.group("prefix") or '',
+            filename=match.group("filename") or ''
         )
-
-    def __init__(self, path: str):
-        self.path = re.sub(r'/+', r'/', path)
-        self.bucket, self.prefix, self.filename = self.extract_match()
 
     def is_root(self):
         return self.path == ROOT
@@ -78,11 +93,33 @@ class Match:
     def is_file(self):
         return not self.is_dir()
 
-    def calculate_match(self, other):
-        if self.is_file:
-            return self
+    @classmethod
+    def infer_file_operation_destination(cls, src: Match, dst: Match) -> Match:
+        """Return a match with the dst path and filename if exists.
+        If not, return dst path with src filename.
+
+        Examples:
+            >>> src = Match('/foo/bar1/baz')
+            >>> dst = Match('/foo/bar2/')
+            >>> Match.infer_file_operation_destination(src, dst)
+            Match('/foo/bar2/baz')
+
+            >>> src = Match('/foo/bar1/baz')
+            >>> dst = Match('/foo/bar2/baz2')
+            >>> Match.infer_file_operation_destination(src, dst)
+            Match('/foo/bar2/baz2')
+
+        Raises:
+            ValueError: If src was not a valid file match.
+        """
+        if not src.is_file():
+            raise ValueError('Src must be a valid match to a file')
+
+        if dst.is_file():
+            return dst
+
         else:
-            return Match(join(self.path, other.filename))
+            return Match(join(dst.path, src.filename))
 
 
 def _validate_directory(func):
@@ -117,6 +154,19 @@ class Pyminio:
     """Pyminio is an os-like cover to minio."""
     def __init__(self, minio_obj: Minio):
         self.minio_obj = minio_obj
+
+    @classmethod
+    def from_credentials(
+        cls,
+        endpoint: str,
+        access_key: str,
+        secret_key: str,
+        **kwargs
+    ) -> Pyminio:
+        return cls(minio_obj=Minio(endpoint=endpoint,
+                                   access_key=access_key,
+                                   secret_key=secret_key,
+                                   **kwargs))
 
     @_validate_directory
     def mkdirs(self, path: str):
@@ -221,7 +271,7 @@ class Pyminio:
         try:
             self.get(path)
 
-        except RuntimeError:
+        except ValueError:
             return False
 
         return True
@@ -234,12 +284,16 @@ class Pyminio:
         match = Match(path)
         return self.exists(path) and match.is_dir()
 
+    def truncate(self):
+        for bucket in self.listdir(ROOT):
+            self.rmdir(join(ROOT, bucket), recursive=True)
+
     @_validate_directory
     def rmdir(self, path: str, recursive: bool = False):
         """Remove specified directory.
 
-        If recursive flag is used, remove all content recursively.
-        Works like linux's rmdir (-r).
+        If recursive flag is used, remove all content recursively
+        like linux's rm -r.
 
         Args:
             path: path of a directory.
@@ -248,24 +302,27 @@ class Pyminio:
         match = Match(path)
 
         if match.is_root():
-            for bucket in self.listdir(ROOT):
-                self.rmdir(join(ROOT, bucket), recursive)
-            return
+            if recursive:
+                return self.truncate()
+            raise DirectoryNotEmptyError("can not recursively delete "
+                                         "unempty directory")
 
-        file_objects = self._get_objects_at(match)
+        objects_in_directory = self._get_objects_at(match)
 
-        if len(file_objects) > 0:
+        if len(objects_in_directory) > 0:
             if not recursive:
-                raise RuntimeError("Directory is not empty")
+                raise DirectoryNotEmptyError("can not recursively delete "
+                                             "unempty directory")
 
             files = [file_obj.object_name
-                     for file_obj in file_objects if not file_obj.is_dir]
+                     for file_obj in objects_in_directory
+                     if not file_obj.is_dir]
 
             # list activates remove
             list(self.minio_obj.remove_objects(match.bucket, files))
 
             dirs = [file_obj.object_name
-                    for file_obj in file_objects if file_obj.is_dir]
+                    for file_obj in objects_in_directory if file_obj.is_dir]
 
             for directory in dirs:
                 self.rmdir(join(ROOT, match.bucket, directory), recursive=True)
@@ -275,7 +332,8 @@ class Pyminio:
                 self.minio_obj.remove_bucket(match.bucket)
 
             except BucketNotEmpty:
-                raise RuntimeError("Directory is not empty")
+                raise DirectoryNotEmptyError("can not recursively delete "
+                                             "unempty directory")
 
         else:
             self.minio_obj.remove_object(match.bucket, match.prefix)
@@ -334,10 +392,18 @@ class Pyminio:
         """
         from_match = Match(from_path)
 
-        if from_match.is_dir() and not recursive:
-            raise RuntimeError("cannot copy folder unrecursively")
+        # TODO: implement copy recursive (Task #12)
+        # if from_match.is_dir() and not recursive:
+        #     raise ValueError("copying a directory must be done recursively")
 
-        to_match = Match(to_path).calculate_match(from_match)
+        if from_match.is_dir():
+            raise NotImplementedError("cannot copy folder, currently "
+                                      "unsupported")
+
+        to_match = Match.infer_file_operation_destination(
+            src=from_match,
+            dst=Match(to_path)
+        )
 
         self.minio_obj.copy_object(to_match.bucket, to_match.relative_path,
                                    join(from_match.bucket,
@@ -353,7 +419,10 @@ class Pyminio:
             to_path: destination path.
         """
         from_match = Match(from_path)
-        to_match = Match(to_path).calculate_match(from_match)
+        to_match = Match.infer_file_operation_destination(
+            src=from_match,
+            dst=Match(to_path)
+        )
 
         try:
             self.cp(from_match.path, to_match.path)
@@ -398,8 +467,8 @@ class Pyminio:
                 return_obj = Folder
 
         except (NoSuchKey, StopIteration):
-            raise RuntimeError(f"cannot access {path}: "
-                               "No such file or directory")
+            raise ValueError(f"cannot access {path}: "
+                             "No such file or directory")
 
         details_metadata = \
             self._extract_metadata(details.metadata)
@@ -426,14 +495,12 @@ class Pyminio:
         match = Match(path)
         data_file = BytesIO(data)
 
-        file_metadata = self._get_metadata(data_file, metadata)
-
         self.minio_obj.put_object(
             bucket_name=match.bucket,
             object_name=match.relative_path,
             data=data_file,
             length=len(data),
-            metadata=file_metadata
+            metadata=metadata
         )
         data_file.close()
 
@@ -454,20 +521,8 @@ class Pyminio:
         if match.is_dir():
             match = Match(join(path, basename(file_path)))
 
-        with open(file_path, 'rb') as file_pointer:
-            file_metadata = self._get_metadata(file_pointer, metadata)
-
         self.minio_obj.fput_object(match.bucket, match.relative_path,
-                                   file_path, metadata=file_metadata)
-
-    @classmethod
-    def _get_metadata(cls, file_pointer: File, metadata: Dict):
-        file_metadata = {}  # TODO: review this.
-
-        if metadata is not None:
-            file_metadata.update(metadata)
-
-        return file_metadata
+                                   file_path, metadata=metadata)
 
     @_validate_directory
     def get_last_object(self, path: str) -> File:
@@ -486,17 +541,3 @@ class Pyminio:
         new_path = join(ROOT, match.bucket, relative_path)
 
         return self.get(new_path)
-
-
-if __name__ == "__main__":
-    minio_obj = Minio(
-        endpoint=environ.get('MINIO_CONNECTION'),
-        access_key=environ.get('MINIO_ACCESS_KEY'),
-        secret_key=environ.get('MINIO_SECRET_KEY'),
-        secure=False
-    )
-
-    pyminio = Pyminio(minio_obj=minio_obj)
-
-    import ipdb
-    ipdb.set_trace()

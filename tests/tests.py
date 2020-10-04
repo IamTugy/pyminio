@@ -3,9 +3,10 @@ from os.path import join
 import pytest
 
 from .utils import PyminioTest
+from pyminio.exceptions import DirectoryNotEmptyError
 
 ROOT = '/'
-FILE_CONTENT = bytes('test', 'UTF-8')
+FILE_CONTENT = b'test'
 
 
 def _mkdirs_recursively(client, fs, relative_path):
@@ -97,11 +98,11 @@ def test_put_file(client):
     },
 })
 def test_listdir(client):
-    assert client.listdir('/').sort() == ['foo1/', 'foo2/', 'foo3/'].sort()
+    assert set(client.listdir('/')) == {'foo1/', 'foo2/', 'foo3/'}
     assert client.listdir('/foo1/') == ['bar/']
     assert client.listdir('/foo2/') == ['bar/']
     assert client.listdir('/foo2/bar/') == ['baz']
-    assert client.listdir('/foo3/bar/').sort() == ['baz1/', 'baz2/'].sort()
+    assert set(client.listdir('/foo3/bar/')) == {'baz1/', 'baz2/'}
 
 
 @mock_fs({
@@ -163,13 +164,16 @@ def test_rmdir(client):
     client.rmdir('/foo1/bar/')
     assert not client.exists('/foo1/bar/')
 
-    pytest.raises(ValueError, client.rmdir, '/foo2/bar/baz2')
+    with pytest.raises(ValueError):
+        client.rmdir('/foo2/bar/baz2')
 
-    pytest.raises(RuntimeError, client.rmdir, '/foo2/bar/')
+    with pytest.raises(DirectoryNotEmptyError):
+        client.rmdir('/foo2/bar/')
     client.rmdir('/foo2/bar/', recursive=True)
     assert not client.exists('/foo2/bar/')
 
-    pytest.raises(RuntimeError, client.rmdir, '/foo3/')
+    with pytest.raises(DirectoryNotEmptyError):
+        client.rmdir('/foo3/')
     client.rmdir('/foo3/', recursive=True)
     assert not client.exists('/foo3/')
 
@@ -201,11 +205,13 @@ def test_rm(client):
     client.rm('/foo2/bar/baz2')
     assert not client.exists('/foo1/bar/baz2')
 
-    pytest.raises(RuntimeError, client.rm, '/foo2/bar/')
+    with pytest.raises(DirectoryNotEmptyError):
+        client.rm('/foo2/bar/')
     client.rm('/foo2/bar/', recursive=True)
     assert not client.exists('/foo2/bar/')
 
-    pytest.raises(RuntimeError, client.rm, '/foo3/')
+    with pytest.raises(DirectoryNotEmptyError):
+        client.rm('/foo3/')
     client.rm('/foo3/', recursive=True)
     assert not client.exists('/foo3/')
 
