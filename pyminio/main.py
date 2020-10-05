@@ -1,33 +1,134 @@
-import os
+from __future__ import annotations
+
 import re
-import pytz
-from minio import Minio
-from io import StringIO
-from typing import List, Dict, Union
+
+from os import environ
+from io import BytesIO
 from datetime import datetime
+from dataclasses import dataclass
+from typing import List, Dict, Any, Tuple
+from os.path import join, basename, dirname, normpath
+
+import pytz
+from cached_property import cached_property
+from minio import Minio, definitions
 from attrdict import AttrDict
-from collections import namedtuple
-from os.path import join, basename
 from minio.error import NoSuchKey, BucketNotEmpty
+
+from .exceptions import DirectoryNotEmptyError
 
 ROOT = "/"
 
-TIMEZONE = pytz.timezone("Asia/Jerusalem")
 
-File = namedtuple('File', ['name', 'full_path', 'data', 'metadata'])
-Match = namedtuple('Match', ['bucket', 'prefix', 'filename'])
+@dataclass
+class ObjectData:
+    name: str
+    full_path: str
+    metadata: Dict[str, Any]
+
+
+@dataclass
+class File(ObjectData):
+    data: bytes
+
+
+@dataclass
+class Folder(ObjectData):
+    pass
+
+
+class Match:
+    PATH_STRUCTURE = \
+        re.compile(r"/(?P<bucket>.*?)/+(?P<prefix>.*/+)?(?P<filename>.+[^/])?")
+
+    def __init__(self, path: str):
+        self._path = path
+        self._match = self._get_match()
+
+    @cached_property
+    def path(self):
+        return re.sub(r'/+', r'/', self._path)
+
+    @property
+    def bucket(self):
+        return self._match.bucket
+
+    @property
+    def prefix(self):
+        return self._match.prefix
+
+    @property
+    def filename(self):
+        return self._match.filename
+
+    def _get_match(self) -> AttrDict:
+        """Get the bucket name, path prefix and file's name from path."""
+        if self.is_root():
+            return AttrDict(bucket='', prefix='', filename='')
+
+        match = self.PATH_STRUCTURE.match(self.path)
+
+        if match is None:
+            raise ValueError(f'{self.path} is not a valid path')
+
+        return AttrDict(
+            bucket=match.group("bucket"),
+            prefix=match.group("prefix") or '',
+            filename=match.group("filename") or ''
+        )
+
+    def is_root(self):
+        return self.path == ROOT
+
+    @property
+    def relative_path(self):
+        return join(self.prefix, self.filename)
+
+    def is_bucket(self):
+        return self.relative_path == ''
+
+    def is_dir(self):
+        return self.filename == ''
+
+    def is_file(self):
+        return not self.is_dir()
+
+    @classmethod
+    def infer_file_operation_destination(cls, src: Match, dst: Match) -> Match:
+        """Return a match with the dst path and filename if exists.
+        If not, return dst path with src filename.
+
+        Examples:
+            >>> src = Match('/foo/bar1/baz')
+            >>> dst = Match('/foo/bar2/')
+            >>> Match.infer_file_operation_destination(src, dst)
+            Match('/foo/bar2/baz')
+
+            >>> src = Match('/foo/bar1/baz')
+            >>> dst = Match('/foo/bar2/baz2')
+            >>> Match.infer_file_operation_destination(src, dst)
+            Match('/foo/bar2/baz2')
+
+        Raises:
+            ValueError: If src was not a valid file match.
+        """
+        if not src.is_file():
+            raise ValueError('Src must be a valid match to a file')
+
+        if dst.is_file():
+            return dst
+
+        else:
+            return Match(join(dst.path, src.filename))
 
 
 def _validate_directory(func):
+    """Check if directory path is valid. """
     def decorated_method(self, path: str, *args, **kwargs):
-        if path != ROOT:
-            match = self.PATH_STRUCTURE.match(path)
-            if match is None:
-                raise ValueError(f'{path} is not a valid path')
-
-            if match.group('filename') is not None:
-                raise ValueError(f"{path} is not a valid directory path."
-                                 " must be absolute and end with /")
+        match = Match(path)
+        if match.is_file():
+            raise ValueError(f"{path} is not a valid directory path."
+                             " must be absolute and end with /")
 
         return func(self, path, *args, **kwargs)
 
@@ -35,107 +136,89 @@ def _validate_directory(func):
 
 
 def get_last_modified(obj):
+    """Return object's last modified time. """
     if obj.last_modified is None:
-        return TIMEZONE.localize(datetime.fromtimestamp(0))
+        return pytz.UTC.localize(datetime.fromtimestamp(0))
+
     return obj.last_modified
 
 
 def get_creation_date(obj):
+    """Return object's creation date. """
     if obj.creation_date is None:
-        return TIMEZONE.localize(datetime.fromtimestamp(0))
+        return pytz.UTC.localize(datetime.fromtimestamp(0))
     return obj.creation_date
 
 
 class Pyminio:
-    # get from file
-    PATH_STRUCTURE = \
-        re.compile(r"/(?P<bucket>.*?)/(?P<prefix>.*/)?(?P<filename>.+[^/])?")
+    """Pyminio is an os-like cover to minio."""
+    def __init__(self, minio_obj: Minio):
+        self.minio_obj = minio_obj
 
-    ENDPOINT = os.environ.get('MINIO_CONNECTION')
-    # for example "localhost:9000"
-    ACCESS_KEY = os.environ.get('MINIO_ACCESS_KEY')
-    SECRET_KEY = os.environ.get('MINIO_SECRET_KEY')
-
-    def __init__(self, endpoint=None, access_key=None,
-                 secret_key=None):
-
-        self._endpoint = endpoint or self.ENDPOINT
-        self._access_key = access_key or self.ACCESS_KEY
-        self._secret_key = secret_key or self.SECRET_KEY
-
-        self.minio_obj = Minio(endpoint=self._endpoint,
-                               access_key=self._access_key,
-                               secret_key=self._secret_key,
-                               secure=False)
-
-    def _get_match(self, path: str) -> Match:
-        """Get the bucket name, path prefix and file's name from path.
-
-        Returns:
-            Match. bucket name, path without filename and bucket name,
-                   file's name
-        """
-        if path == ROOT:
-            return Match(bucket='', prefix=None, filename=None)
-
-        match = self.PATH_STRUCTURE.match(path)
-        if not match:
-            raise ValueError(f'{path} is not a valid path')
-
-        return Match(bucket=match.group("bucket"),
-                     prefix=match.group("prefix"),
-                     filename=match.group("filename"))
+    @classmethod
+    def from_credentials(
+        cls,
+        endpoint: str,
+        access_key: str,
+        secret_key: str,
+        **kwargs
+    ) -> Pyminio:
+        return cls(minio_obj=Minio(endpoint=endpoint,
+                                   access_key=access_key,
+                                   secret_key=secret_key,
+                                   **kwargs))
 
     @_validate_directory
     def mkdirs(self, path: str):
-        bucket, directory_path, _ = self._get_match(path)
+        """Create path of directories.
 
-        if bucket == '':
+        Works like linux's: 'mkdir -p'.
+
+        Args:
+            path: The absolute path to create.
+        """
+        match = Match(path)
+
+        if match.is_root():
             raise ValueError("cannot create / directory")
 
         #  make bucket
-        if not self.minio_obj.bucket_exists(bucket_name=bucket):
-            self.minio_obj.make_bucket(bucket_name=bucket)
+        if not self.minio_obj.bucket_exists(bucket_name=match.bucket):
+            self.minio_obj.make_bucket(bucket_name=match.bucket)
 
-        if directory_path is None:
-            #  path is only bucket
+        if match.is_bucket():
             return
 
+        # TODO: check if all directories has metadata and stuff.
         #  make sub directories (minio is making all path)
-        empty_file = StringIO()
-        self.minio_obj.put_object(bucket_name=bucket,
-                                  object_name=directory_path,
+        empty_file = BytesIO()
+        self.minio_obj.put_object(bucket_name=match.bucket,
+                                  object_name=match.prefix,
                                   data=empty_file, length=0)
 
-    def _get_objects_at(self, bucket: str, directory_path: str):
-        return sorted(self.minio_obj.list_objects(bucket_name=bucket,
-                                                  prefix=directory_path),
+    def _get_objects_at(self, match: Match) -> List[definitions.Object]:
+        """Return all objects in the specified bucket and directory path.
+
+        Args:
+            bucket: The bucket desired in minio.
+            directory_path: full directory path inside the bucket.
+        """
+        return sorted(self.minio_obj.list_objects(bucket_name=match.bucket,
+                                                  prefix=match.prefix),
                       key=get_last_modified, reverse=True)
 
     def _get_buckets(self):
+        """Return all existed buckets. """
         return sorted(self.minio_obj.list_buckets(),
                       key=get_creation_date, reverse=True)
 
     @classmethod
-    def _get_relative_path(cls, directory_path: str, file_name: str):
-        # TODO: write this better
-        if directory_path is None:
-            if file_name is None:
-                return ''
-
-            return file_name
-
-        if file_name is None:
-            return directory_path
-
-        return join(directory_path, file_name)
-
-    @classmethod
     def _extract_metadata(cls, detailed_metadata: Dict):
-        """Remove 'X-Amz-Meta-' from al the keys, and lowercase them.
+        """Remove 'X-Amz-Meta-' from all the keys, and lowercase them.
             When metadata is pushed in the minio, the minio is adding
             those details that screw us. this is an unscrewing function.
         """
+        detailed_metadata = detailed_metadata or {}
         return {key.replace('X-Amz-Meta-', '').lower(): value
                 for key, value in detailed_metadata.items()}
 
@@ -144,199 +227,317 @@ class Pyminio:
         """Return all files and directories absolute paths
             within the directory path.
 
+        Works like os.listdir, just only with absolute path.
+
         Args:
             path: path of a directory.
             only_files: return only files name and not directories.
 
         Returns:
-            list. files and directories in path.
+            files and directories in path.
         """
-        bucket, directory_path, _ = self._get_match(path)
+        match = Match(path)
 
-        if directory_path is None:
-            directory_path = ''
-
-        if bucket == '':
+        if match.is_root():
             if only_files:
                 return []
 
             return [f"{b.name}/" for b in self._get_buckets()]
 
-        return [obj.object_name.replace(directory_path, "")
-                for obj in self._get_objects_at(bucket, directory_path)
+        return [obj.object_name.replace(match.prefix, '')
+                for obj in self._get_objects_at(match)
                 if not only_files or not obj.is_dir]
 
-    def exists(self, path: str):
-        bucket, directory_path, filename = self._get_match(path)
+    def exists(self, path: str) -> bool:
+        """Check if the specified path exists.
 
-        if bucket == '':
+        Works like os.path.exists.
+        """
+        try:
+            match = Match(path)
+
+        except ValueError:
+            return False
+
+        if match.is_root():
             return True
 
-        bucket_exists = self.minio_obj.bucket_exists(bucket)
+        bucket_exists = self.minio_obj.bucket_exists(match.bucket)
         if not bucket_exists:
             return False
 
-        relative_path = self._get_relative_path(directory_path, filename)
-
+        if match.is_bucket():
+            return True
         try:
-            self.minio_obj.get_object(bucket, relative_path)
+            self.get(path)
 
-        except NoSuchKey:
+        except ValueError:
             return False
 
         return True
 
     def isdir(self, path: str):
-        _, _, filename = self._get_match(path)
-        return self.exists(path) and filename is None
+        """Check if the specified path is a directory.
+
+        Works like os.path.isdir
+        """
+        match = Match(path)
+        return self.exists(path) and match.is_dir()
+
+    def truncate(self):
+        for bucket in self.listdir(ROOT):
+            self.rmdir(join(ROOT, bucket), recursive=True)
 
     @_validate_directory
     def rmdir(self, path: str, recursive: bool = False):
-        bucket, directory_path, _ = self._get_match(path)
+        """Remove specified directory.
 
-        if bucket == '':
-            raise ValueError(f"cannot remove root ('{ROOT}')")
+        If recursive flag is used, remove all content recursively
+        like linux's rm -r.
 
-        file_objects = self._get_objects_at(bucket, directory_path)
+        Args:
+            path: path of a directory.
+            recursive: remove content recursively.
+        """
+        match = Match(path)
 
-        if len(file_objects) > 0:
+        if match.is_root():
+            if recursive:
+                return self.truncate()
+            raise DirectoryNotEmptyError("can not recursively delete "
+                                         "unempty directory")
+
+        objects_in_directory = self._get_objects_at(match)
+
+        if len(objects_in_directory) > 0:
             if not recursive:
-                raise RuntimeError("Directory is not empty")
+                raise DirectoryNotEmptyError("can not recursively delete "
+                                             "unempty directory")
 
             files = [file_obj.object_name
-                     for file_obj in file_objects if not file_obj.is_dir]
+                     for file_obj in objects_in_directory
+                     if not file_obj.is_dir]
 
             # list activates remove
-            list(self.minio_obj.remove_objects(bucket, files))
+            list(self.minio_obj.remove_objects(match.bucket, files))
 
             dirs = [file_obj.object_name
-                    for file_obj in file_objects if file_obj.is_dir]
+                    for file_obj in objects_in_directory if file_obj.is_dir]
 
             for directory in dirs:
-                self.rmdir(join(ROOT, bucket, directory), recursive=True)
+                self.rmdir(join(ROOT, match.bucket, directory), recursive=True)
 
-        if directory_path is None:
+        if match.is_bucket():
             try:
-                self.minio_obj.remove_bucket(bucket)
+                self.minio_obj.remove_bucket(match.bucket)
 
             except BucketNotEmpty:
-                raise RuntimeError("Directory is not empty")
+                raise DirectoryNotEmptyError("can not recursively delete "
+                                             "unempty directory")
 
         else:
-            self.minio_obj.remove_object(bucket, directory_path)
+            self.minio_obj.remove_object(match.bucket, match.prefix)
 
     def rm(self, path: str, recursive: bool = False):
-        if recursive:
-            return self.rmdir(path, recursive=True)
+        """Remove specified directory or file.
 
+        If recursive flag is used, remove all content recursively.
+        Works like linux's rm (-r).
+
+        Args:
+            path: path of a directory or a file.
+            recursive: remove content recursively.
+        """
         if self.isdir(path):
-            raise ValueError(f"cannot remove {path}: "
-                             "Is a directory")
+            return self.rmdir(path, recursive=recursive)
 
-        bucket, directory_path, filename = self._get_match(path)
+        match = Match(path)
+        self.minio_obj.remove_object(match.bucket, match.relative_path)
 
-        relative_path = self._get_relative_path(directory_path, filename)
-        self.minio_obj.remove_object(bucket, relative_path)
+    # TODO: implement copy recursive (Task #12)
+    # def _copy_directory(self, from_path: str, to_path: str):
+    #     objects = self.get_objects_at(from_path)
+    #     files = []
+    #     directories = []
+    #     for obj in objects:
+    #         if obj.is_dir:
+    #             directories.append(obj)
+    #         else:
+    #             files.append(obj)
+    #     if directories == []:
+    #         pass  # make path
+    #         # self.mkdirs(join(to_path, dirname(from_path), ''))
+    #     else:
+    #         #  recursive run with next directories
+    #         for directory in directories:
+    #             self._copy_directory(
+    #                 from_path=,
+    #                 to_path=join(to_path, basename(directory))
+    #     for file_to_copy in files:
+    #         #  create file
 
-    def cp(self, from_path: str, to_path: str):
-        if self.isdir(from_path):
-            raise NotImplementedError("currently not supported")
+    def cp(self, from_path: str, to_path: str, recursive: bool = False):
+        """Copy files from one directory to another.
 
-        from_bucket, from_directory_path, from_filename = self._get_match(
-            from_path
+        If to_path will be a path to a dictionary, the name will be
+        the copied file name. if it will be a path with a file name,
+        the name of the file will be this file's name.
+
+        Works like linux's cp (-r).
+
+        Args:
+            from_path: source path to a file.
+            to_path: destination path.
+            recursive: copy content recursively.
+        """
+        from_match = Match(from_path)
+
+        # TODO: implement copy recursive (Task #12)
+        # if from_match.is_dir() and not recursive:
+        #     raise ValueError("copying a directory must be done recursively")
+
+        if from_match.is_dir():
+            raise NotImplementedError("cannot copy folder, currently "
+                                      "unsupported")
+
+        to_match = Match.infer_file_operation_destination(
+            src=from_match,
+            dst=Match(to_path)
         )
-        to_bucket, to_directory_path, to_filename = self._get_match(to_path)
 
-        relative_from_path = self._get_relative_path(from_directory_path,
-                                                     from_filename)
-
-        if to_filename is None:
-            to_filename = from_filename
-
-        relative_to_path = self._get_relative_path(to_directory_path,
-                                                   to_filename)
-
-        self.minio_obj.copy_object(to_bucket, relative_to_path,
-                                   join(from_bucket,
-                                        relative_from_path))
+        self.minio_obj.copy_object(to_match.bucket, to_match.relative_path,
+                                   join(from_match.bucket,
+                                        from_match.relative_path))
 
     def mv(self, from_path: str, to_path: str):
-        self.cp(from_path, to_path)
-        self.rm(from_path)
+        """Move files from one directory to another.
 
-    def get(self, path: str):
-        bucket, directory_path, filename = self._get_match(path)
-        relative_path = self._get_relative_path(directory_path, filename)
+        Works like linux's mv.
+
+        Args:
+            from_path: source path.
+            to_path: destination path.
+        """
+        from_match = Match(from_path)
+        to_match = Match.infer_file_operation_destination(
+            src=from_match,
+            dst=Match(to_path)
+        )
 
         try:
+            self.cp(from_match.path, to_match.path)
 
-            data = self.minio_obj.get_object(bucket, relative_path).data
-            details = self.minio_obj.stat_object(bucket, relative_path)
-            details_metadata = self._extract_metadata(details.metadata)
+        finally:
+            if(self.exists(from_match.path) and self.exists(to_match.path)):
+                self.rm(from_match.path)
 
-            metadata = {
-                "is_dir": details.is_dir,
-                "last_modified": details.last_modified,
-                "size": details.size
-            }
-            metadata.update(details_metadata)
+    def get(self, path: str) -> ObjectData:
+        """Get file or directory from minio.
 
-            return File(name=filename, full_path=path, data=data,
-                        metadata=AttrDict(metadata))
+        Args:
+            path: path of a directory or a file.
+        """
+        match = Match(path)
+        kwargs = AttrDict()
 
-        except NoSuchKey:
-            raise RuntimeError(f"cannot access {path}: "
-                               "No such file or directory")
+        if match.is_bucket():
+            raise ValueError('Minio bucket has no representable object.')
+        try:
+            if match.is_file():
+                kwargs.data = self.minio_obj.get_object(
+                    match.bucket, match.relative_path).data
 
-    def put_data(self, path: str, data: Union[str, File],
+                details = self.minio_obj.stat_object(
+                    match.bucket, match.relative_path)
+                name = match.filename
+                return_obj = File
+
+            else:
+                parent_directory = \
+                    join(dirname(normpath(match.prefix)), '')
+                objects = self.minio_obj.list_objects(
+                    bucket_name=match.bucket,
+                    prefix=parent_directory
+                )
+
+                details = next(filter(
+                    lambda obj: obj.object_name == match.relative_path,
+                    objects))
+                name = join(basename(normpath(details.object_name)), '')
+                return_obj = Folder
+
+        except (NoSuchKey, StopIteration):
+            raise ValueError(f"cannot access {path}: "
+                             "No such file or directory")
+
+        details_metadata = \
+            self._extract_metadata(details.metadata)
+
+        metadata = {
+            "is_dir": details.is_dir,
+            "last_modified": details.last_modified,
+            "size": details.size
+        }
+        metadata.update(details_metadata)
+
+        return return_obj(name=name, full_path=path,
+                          metadata=AttrDict(metadata), **kwargs)
+
+    def put_data(self, path: str, data: bytes,
                  metadata: Dict = None):
-        bucket, prefix, filename = self._get_match(path)
-        data_file = data
-        if isinstance(data, str):
-            data_file = StringIO()
-            data_file.write(data)
+        """Put data in file inside a minio folder.
 
-        file_metadata = self._get_metadata(data_file, metadata)
+        Args:
+            path: destination of the new file with its name in minio.
+            data: the data that the file will contain in bytes.
+            metadata: metadata dictionary to append the file.
+        """
+        match = Match(path)
+        data_file = BytesIO(data)
 
-        self.minio_obj.put_object(bucket_name=bucket,
-                                  object_name=f'{prefix}{filename}',
-                                  data=data_file,
-                                  length=len(data),
-                                  metadata=file_metadata)
+        self.minio_obj.put_object(
+            bucket_name=match.bucket,
+            object_name=match.relative_path,
+            data=data_file,
+            length=len(data),
+            metadata=metadata
+        )
         data_file.close()
 
     def put_file(self, path: str, file_path: str, metadata: Dict = None):
-        bucket, prefix, filename = self._get_match(path)
+        """Put file inside a minio folder.
 
-        if filename is None:
-            filename = basename(file_path)
+        If file_path will be a path to a dictionary, the name will be
+        the copied file name. if it will be a path with a file name,
+        the name of the file will be this file's name.
 
-        with open(file_path, 'rb') as file_pointer:
-            file_metadata = self._get_metadata(file_pointer, metadata)
+        Args:
+            path: destination of the new file in minio.
+            file_path: the path to the file.
+            metadata: metadata dictionary to append the file.
+        """
+        match = Match(path)
 
-        relative_path = self._get_relative_path(prefix, filename)
-        self.minio_obj.fput_object(bucket, relative_path,
-                                   file_path, metadata=file_metadata)
+        if match.is_dir():
+            match = Match(join(path, basename(file_path)))
 
-    @classmethod
-    def _get_metadata(cls, file_pointer: File, metadata: Dict):
-        file_metadata = {}  # TODO: review this.
-
-        if metadata is not None:
-            file_metadata.update(metadata)
-
-        return file_metadata
+        self.minio_obj.fput_object(match.bucket, match.relative_path,
+                                   file_path, metadata=metadata)
 
     @_validate_directory
-    def get_last_object(self, path: str):
-        bucket, directory_path, _ = self._get_match(path)
+    def get_last_object(self, path: str) -> File:
+        """Return the last modified object.
+
+        Args:
+            path: path of a directory.
+        """
+        match = Match(path)
         objects_names_in_dir = self.listdir(path, only_files=True)
         if len(objects_names_in_dir) == 0:
             return None
 
         last_object_name = objects_names_in_dir[0]
-        relative_path = self._get_relative_path(directory_path,
-                                                last_object_name)
-        new_path = join(ROOT, bucket, relative_path)
+        relative_path = join(match.prefix, last_object_name)
+        new_path = join(ROOT, match.bucket, relative_path)
 
         return self.get(new_path)

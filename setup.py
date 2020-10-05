@@ -13,6 +13,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/mmm1513/pyminio",
     packages=setuptools.find_packages(),
+    install_requires=[],  # TODO: MUST FIX
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
