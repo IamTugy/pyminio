@@ -61,26 +61,6 @@ def test_exists(client):
     assert not client.exists('/foo/bar/baz/')
 
 
-@pytest.mark.skip()
-@mock_fs({
-    'foo': {
-        'bar': None
-    }
-})
-def test_put_data(client):
-    assert client.exists('/foo/bar')
-
-
-@pytest.mark.skip()
-@mock_fs({
-    'foo': {
-        'bar': None
-    }
-})
-def test_put_file(client):
-    assert client.exists('/foo/bar')
-
-
 @mock_fs({
     'foo1': {
         'bar': [],
@@ -249,7 +229,6 @@ def test_get_folder(client):
     assert folder_obj2.metadata.is_dir
 
 
-@pytest.mark.skip()
 @mock_fs({
     'foo': {
         'bar1': [],
@@ -261,11 +240,10 @@ def test_cp(client):
     client.cp('/foo/baz', '/foo/bar2/')
     assert client.exists('/foo/bar2/baz')
 
-    client.cp('/foo/bar2/', '/foo/bar1/')
+    client.cp('/foo/bar2/', '/foo/bar1/', recursive=True)
     assert client.exists('/foo/bar1/bar2/baz')
 
 
-@pytest.mark.skip()
 @mock_fs({
     'foo': {
         'bar1': [],
@@ -274,7 +252,33 @@ def test_cp(client):
     }
 })
 def test_mv(client):
-    pass  # like cp but check if not exists afterwards
+    client.mv('/foo/baz', '/foo/bar2/')
+    assert client.exists('/foo/bar2/baz')
+    assert not client.exists('/foo/baz')
+
+    client.mv('/foo/bar2/', '/foo/bar1/', recursive=True)
+    assert client.exists('/foo/bar1/bar2/baz')
+    assert not client.exists('/foo/bar2/')
+
+    client.mv('/foo/', '/foo1/', recursive=True)
+    assert client.exists('/foo1/bar1/bar2/baz')
+    assert not client.exists('/foo/')
+
+
+@mock_fs({
+    'foo': {
+        'bar1': [],
+        'baz': None,
+        'bar2': [],
+    },
+    'foo1': []
+})
+def test_mv_to_exists_bucket(client):
+    client.mv('/foo/', '/foo1/', recursive=True)
+    assert client.exists('/foo1/foo/bar1/')
+    assert client.exists('/foo1/foo/bar2/')
+    assert client.exists('/foo1/foo/baz')
+    assert not client.exists('/foo/')
 
 
 @mock_fs({

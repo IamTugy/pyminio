@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import re
 
-from os import environ
 from io import BytesIO
 from datetime import datetime
+from types import FunctionType
 from dataclasses import dataclass
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 from os.path import join, basename, dirname, normpath
 
 import pytz
@@ -94,7 +94,7 @@ class Match:
         return not self.is_dir()
 
     @classmethod
-    def infer_file_operation_destination(cls, src: Match, dst: Match) -> Match:
+    def infer_operation_destination(cls, src: Match, dst: Match) -> Match:
         """Return a match with the dst path and filename if exists.
         If not, return dst path with src filename.
 
@@ -307,25 +307,34 @@ class Pyminio:
             raise DirectoryNotEmptyError("can not recursively delete "
                                          "unempty directory")
 
-        objects_in_directory = self._get_objects_at(match)
+        dirs_to_delete = [path]
 
-        if len(objects_in_directory) > 0:
-            if not recursive:
-                raise DirectoryNotEmptyError("can not recursively delete "
-                                             "unempty directory")
+        while len(dirs_to_delete):
+            current_dir_match = Match(dirs_to_delete.pop(0))
+            objects_in_directory = self._get_objects_at(current_dir_match)
+            files = []
+            dirs = []
 
-            files = [file_obj.object_name
-                     for file_obj in objects_in_directory
-                     if not file_obj.is_dir]
+            if len(objects_in_directory) > 0:
+                if not recursive:
+                    raise DirectoryNotEmptyError("can not recursively delete "
+                                                 "unempty directory")
 
-            # list activates remove
-            list(self.minio_obj.remove_objects(match.bucket, files))
+                for obj in objects_in_directory:
+                    if obj.is_dir:
+                        dirs.append(
+                            f"/{obj.bucket_name}/{obj.object_name}")
+                    else:
+                        files.append(obj.object_name)
+                if len(files) > 0:
+                    # list activates remove
+                    list(self.minio_obj.remove_objects(match.bucket, files))
 
-            dirs = [file_obj.object_name
-                    for file_obj in objects_in_directory if file_obj.is_dir]
+                dirs_to_delete += dirs
 
-            for directory in dirs:
-                self.rmdir(join(ROOT, match.bucket, directory), recursive=True)
+            if len(dirs) == 0 and not current_dir_match.is_bucket():
+                self.minio_obj.remove_object(current_dir_match.bucket,
+                                             current_dir_match.prefix)
 
         if match.is_bucket():
             try:
@@ -334,9 +343,6 @@ class Pyminio:
             except BucketNotEmpty:
                 raise DirectoryNotEmptyError("can not recursively delete "
                                              "unempty directory")
-
-        else:
-            self.minio_obj.remove_object(match.bucket, match.prefix)
 
     def rm(self, path: str, recursive: bool = False):
         """Remove specified directory or file.
@@ -354,27 +360,66 @@ class Pyminio:
         match = Match(path)
         self.minio_obj.remove_object(match.bucket, match.relative_path)
 
-    # TODO: implement copy recursive (Task #12)
-    # def _copy_directory(self, from_path: str, to_path: str):
-    #     objects = self.get_objects_at(from_path)
-    #     files = []
-    #     directories = []
-    #     for obj in objects:
-    #         if obj.is_dir:
-    #             directories.append(obj)
-    #         else:
-    #             files.append(obj)
-    #     if directories == []:
-    #         pass  # make path
-    #         # self.mkdirs(join(to_path, dirname(from_path), ''))
-    #     else:
-    #         #  recursive run with next directories
-    #         for directory in directories:
-    #             self._copy_directory(
-    #                 from_path=,
-    #                 to_path=join(to_path, basename(directory))
-    #     for file_to_copy in files:
-    #         #  create file
+    def _get_destination(self, from_path: str, to_path: str):
+        from_match = Match(from_path)
+        to_match = Match(to_path)
+
+        if from_match.is_file():
+            return Match.infer_operation_destination(from_match, to_match)
+
+        if to_match.is_dir():
+            if self.exists(to_match.path):
+                return Match(join(to_match.path, basename(
+                    join(from_match.bucket, from_match.prefix)[:-1]), ''))
+
+        else:
+            raise ValueError(
+                "can not activate this method from directory to a file.")
+
+        return to_match
+
+    @_validate_directory
+    def copy_recursively(self, from_path: str, to_path: str):
+        """Copy recursively the content of from_path, to to_path.
+
+        If you acctually wanted to copy from_path as a folder,
+        add that folder's name to to_path and that new path
+        will be created for you.
+
+        Args:
+            from_path: source path to a file.
+            to_path: destination path.
+            recursive: copy content recursively.
+        """
+        files_to_copy = []
+        dirs_to_copy = [from_path]
+
+        while len(dirs_to_copy) > 0:
+            current_dir_match = Match(dirs_to_copy.pop(0))
+            objects_in_directory = self._get_objects_at(current_dir_match)
+            dirs = []
+
+            for obj in objects_in_directory:
+                obj_path = f"/{obj.bucket_name}/{obj.object_name}"
+                if obj.is_dir:
+                    dirs.append(obj_path)
+                else:
+                    files_to_copy.append(AttrDict(
+                        from_path=obj_path,
+                        to_path=join(to_path, obj_path.replace(from_path, '')),
+                    ))
+
+            if len(dirs) == 0:
+                self.mkdirs(join(
+                    to_path, current_dir_match.path.replace(from_path, '')))
+
+            dirs_to_copy += dirs
+
+        for obj_to_copy in files_to_copy:
+            self.cp(
+                from_path=obj_to_copy.from_path,
+                to_path=obj_to_copy.to_path
+            )
 
     def cp(self, from_path: str, to_path: str, recursive: bool = False):
         """Copy files from one directory to another.
@@ -391,25 +436,22 @@ class Pyminio:
             recursive: copy content recursively.
         """
         from_match = Match(from_path)
-
-        # TODO: implement copy recursive (Task #12)
-        # if from_match.is_dir() and not recursive:
-        #     raise ValueError("copying a directory must be done recursively")
+        to_match = self._get_destination(from_path, to_path)
 
         if from_match.is_dir():
-            raise NotImplementedError("cannot copy folder, currently "
-                                      "unsupported")
+            if recursive:
+                self.copy_recursively(from_match.path, to_match.path)
+                return
 
-        to_match = Match.infer_file_operation_destination(
-            src=from_match,
-            dst=Match(to_path)
-        )
+            else:
+                raise ValueError(
+                    "copying a directory must be done recursively")
 
         self.minio_obj.copy_object(to_match.bucket, to_match.relative_path,
                                    join(from_match.bucket,
                                         from_match.relative_path))
 
-    def mv(self, from_path: str, to_path: str):
+    def mv(self, from_path: str, to_path: str, recursive: bool = False):
         """Move files from one directory to another.
 
         Works like linux's mv.
@@ -418,18 +460,13 @@ class Pyminio:
             from_path: source path.
             to_path: destination path.
         """
-        from_match = Match(from_path)
-        to_match = Match.infer_file_operation_destination(
-            src=from_match,
-            dst=Match(to_path)
-        )
-
+        to_match = self._get_destination(from_path, to_path)
         try:
-            self.cp(from_match.path, to_match.path)
+            self.cp(from_path, to_path, recursive)
 
         finally:
-            if(self.exists(from_match.path) and self.exists(to_match.path)):
-                self.rm(from_match.path)
+            if(self.exists(from_path) and self.exists(to_match.path)):
+                self.rm(from_path, recursive)
 
     def get(self, path: str) -> ObjectData:
         """Get file or directory from minio.
