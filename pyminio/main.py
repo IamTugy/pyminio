@@ -4,7 +4,6 @@ import re
 
 from io import BytesIO
 from datetime import datetime
-from types import FunctionType
 from dataclasses import dataclass
 from typing import List, Dict, Any
 from os.path import join, basename, dirname, normpath
