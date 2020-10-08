@@ -224,10 +224,9 @@ class Pyminio:
 
     @_validate_directory
     def listdir(self, path: str, only_files: bool = False) -> List[str]:
-        """Return all files and directories absolute paths
-            within the directory path.
+        """Return all files and directories within the directory path.
 
-        Works like os.listdir, just only with absolute path.
+        Works like os.listdir.
 
         Args:
             path: path of a directory.
