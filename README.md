@@ -1,13 +1,35 @@
 # Pyminio
 Minio is a python client wrapped like os to control minio server.
 
+[![PyPI](https://img.shields.io/pypi/v/pyminio?color=blue&label=pypi%20version)]()
+[![PyPI](https://img.shields.io/pypi/pyversions/pyminio.svg?style=plastic)]()
+[![Downloads](https://pepy.tech/badge/pyminio)](https://pepy.tech/project/pyminio)
+
+## Content
+1. [Installation](#Installation)
+2. [Setting up Pyminio](#Setting-up-Pyminio)
+3. [Usage](#Usage)
+&nbsp;&nbsp;&nbsp;&nbsp;- [mkdirs](#mkdirs)
+&nbsp;&nbsp;&nbsp;&nbsp;- [listdir](#listdir)
+&nbsp;&nbsp;&nbsp;&nbsp;- [exists](#exists)
+&nbsp;&nbsp;&nbsp;&nbsp;- [isdir](#isdir)
+&nbsp;&nbsp;&nbsp;&nbsp;- [truncate](#truncate)
+&nbsp;&nbsp;&nbsp;&nbsp;- [rmdir](#rmdir)
+&nbsp;&nbsp;&nbsp;&nbsp;- [rm](#rm)
+&nbsp;&nbsp;&nbsp;&nbsp;- [cp](#cp)
+&nbsp;&nbsp;&nbsp;&nbsp;- [mv](#mv)
+&nbsp;&nbsp;&nbsp;&nbsp;- [get](#get)
+&nbsp;&nbsp;&nbsp;&nbsp;- [get_last_object](#get_last_object)
+&nbsp;&nbsp;&nbsp;&nbsp;- [put_data](#put_data)
+&nbsp;&nbsp;&nbsp;&nbsp;- [put_file](#put_file)
+
 ## Installation
 Use the package manager [pip](https://pypi.org/project/pyminio/) to install pyminio.
 ```bash
 pip install pyminio
 ```
 
-## Setting up a new Pyminio:
+## Setting up Pyminio:
 In case you want to add your own minio object you can pass it in the constructor like so:
 
 ```python
@@ -21,8 +43,7 @@ SECRET_KEY = environ.get('MINIO_SECRET_KEY')
 minio_obj = Minio(
             endpoint=self.ENDPOINT,
             access_key=self.ACCESS_KEY,
-            secret_key=self.SECRET_KEY,
-            secure=False
+            secret_key=self.SECRET_KEY
         )
 pyminio_client = Pyminio(minio_obj=minio_obj)
 ```
@@ -39,27 +60,13 @@ SECRET_KEY = environ.get('MINIO_SECRET_KEY')
 pyminio_client = Pyminio.from_credentials(
     endpoint=self.ENDPOINT,
     access_key=self.ACCESS_KEY,
-    secret_key=self.SECRET_KEY,
-    secure=False
+    secret_key=self.SECRET_KEY
 )
 ```
 
 You can storage your minio credentials in environment varibles like in these examples or pass them to Pyminio in any other way.
 
 ## Usage:
-- [mkdirs](#mkdirs)
-- [listdir](#listdir)
-- [exists](#exists)
-- [isdir](#isdir)
-- [truncate](#truncate)
-- [rmdir](#rmdir)
-- [rm](#rm)
-- [cp](#cp)
-- [mv](#mv)
-- [get](#get)
-- [get_last_object](#get_last_object)
-- [put_data](#put_data)
-- [put_file](#put_file)
 
 ### mkdirs
 Pyminio.mkdirs will create the given full path if not exists like linux's 'mkdir -p'.

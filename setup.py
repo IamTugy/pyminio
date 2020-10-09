@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="pyminio",
-    version="0.1.0",
+    version="0.2.0",
     author="Michael Tugendhaft",
     author_email="tugmica@gmail.com",
     description="Python client for Minio",
@@ -13,11 +13,19 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/mmm1513/pyminio",
     packages=setuptools.find_packages(),
-    install_requires=[],  # TODO: MUST FIX
+    install_requires=[
+        'minio==6.0.0',
+        'pytz',
+        'cached-property',
+        'attrdict'
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8'
     ],
     python_requires='>=3.6',
 )
