@@ -153,12 +153,12 @@ Pyminio.cp will copy one file or directory to given destination. Works like linu
 This func can only copy recursively when the recursive flag is True. If not, it will raise a ValueError.
 
 #### How will the copy accure? (all directories are copied recursively in this examples)
-| src path   | dst path  | dst exists | new dst      | Explain |
-| ---------- | --------- | ---------- | ------------ | ------- |
-| /foo/bar   | /foo/baz  |    ---     | /foo/baz     | The file's name will be changed from bar to baz. |
-| /foo1/bar  | /foo2/    |    True    | /foo/bar     | The file will be copied to '/foo2/' |
-| /foo/bar/  | /foo/     |    True    | /foo/        | The content of '/foo/bar/' will be copied to '/foo/' |
-| /foo1/bar/ | /foo2/    |   False    | /foo2/bar/   | '/foo1/bar/' will be copied recursively to '/foo2/bar/' |
+| src path   | dst path  | dst exists | new dst      | Explain                                             |
+| ---------- | --------- | ---------- | ------------ | --------------------------------------------------- |
+| /foo/bar   | /foo/baz  |    ---     | /foo/baz     | The file's name will be changed from bar to baz.                            |
+| /foo1/bar  | /foo2/    |    True    | /foo/bar     | The file will be copied to '/foo2/'                                         |
+| /foo/bar/  | /foo/     |    True    | /foo/        | The content of '/foo/bar/' will be copied to '/foo/'                     |
+| /foo1/bar/ | /foo2/    |   False    | /foo2/bar/   | '/foo1/bar/' will be copied recursively to '/foo2/bar/'                  |
 | /foo1/bar/ | /foo2/baz |    ---     |     ---      | ValueError will be raised in attempting to copy directory in to a file |
 
 ```python
