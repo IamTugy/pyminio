@@ -7,9 +7,16 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
-
+  vm-job:
     runs-on: ubuntu-latest
+    services:
+      minio:
+        image: minio/minio:6.0.0
+        env:
+          MINIO_ACCESS_KEY: administrator
+          MINIO_SECRET_KEY: administrato
+        ports: 
+          - 9000:9000
 
     steps:
     - uses: actions/checkout@v2
@@ -29,9 +36,7 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: integration tests
-      run: |
-        docker run -p 9000:9000 -e "MINIO_ACCESS_KEY=administrator" -e "MINIO_SECRET_KEY=administrator" minio/minio server /data
-        pytest -v tests/tests.py
+    - run: pytest -v tests/tests.py
       env:
         MINIO_TEST_CONNECTION: localhost:9000
         MINIO_TEST_ACCESS_KEY: administrator
