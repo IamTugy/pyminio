@@ -7,11 +7,11 @@ on:
     branches: [ master ]
 
 jobs:
-  vm-job:
+  integration-test:
     runs-on: ubuntu-latest
     services:
       minio:
-        image: minio/minio:6.0.0
+        image: minio/minio
         env:
           MINIO_ACCESS_KEY: administrator
           MINIO_SECRET_KEY: administrato
