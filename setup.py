@@ -20,7 +20,6 @@ setuptools.setup(
         'attrdict'
     ],
     classifiers=[
-        "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         'Programming Language :: Python :: 3.6',
