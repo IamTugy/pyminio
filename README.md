@@ -9,19 +9,20 @@ Minio is a python client wrapped like os to control minio server.
 1. [Installation](#Installation)
 2. [Setting up Pyminio](#Setting-up-Pyminio)
 3. [Usage](#Usage)
-&nbsp;&nbsp;&nbsp;&nbsp;- [mkdirs](#mkdirs)
-&nbsp;&nbsp;&nbsp;&nbsp;- [listdir](#listdir)
-&nbsp;&nbsp;&nbsp;&nbsp;- [exists](#exists)
-&nbsp;&nbsp;&nbsp;&nbsp;- [isdir](#isdir)
-&nbsp;&nbsp;&nbsp;&nbsp;- [truncate](#truncate)
-&nbsp;&nbsp;&nbsp;&nbsp;- [rmdir](#rmdir)
-&nbsp;&nbsp;&nbsp;&nbsp;- [rm](#rm)
-&nbsp;&nbsp;&nbsp;&nbsp;- [cp](#cp)
-&nbsp;&nbsp;&nbsp;&nbsp;- [mv](#mv)
-&nbsp;&nbsp;&nbsp;&nbsp;- [get](#get)
-&nbsp;&nbsp;&nbsp;&nbsp;- [get_last_object](#get_last_object)
-&nbsp;&nbsp;&nbsp;&nbsp;- [put_data](#put_data)
-&nbsp;&nbsp;&nbsp;&nbsp;- [put_file](#put_file)
+   - [mkdirs](#mkdirs)
+   - [listdir](#listdir)
+   - [exists](#exists)
+   - [isdir](#isdir)
+   - [truncate](#truncate)
+   - [rmdir](#rmdir)
+   - [rm](#rm)
+   - [cp](#cp)
+   - [mv](#mv)
+   - [get](#get)
+   - [get_last_object](#get_last_object)
+   - [put_data](#put_data)
+   - [put_file](#put_file)
+4. [Contribute](#Contribute)
 
 ## Installation
 Use the package manager [pip](https://pypi.org/project/pyminio/) to install pyminio.
@@ -215,3 +216,18 @@ Pyminio.put_file works like [put_data](#put_data) only that instead of data it g
 >>> metadata = {'Pyminio-is': 'Awesome'}
 >>> pyminio_client.put_data(path='/foo/bar/baz', file_path='/mnt/some_file', metadata=metadata)
 ```
+
+## Contribute
+
+All contributions are welcome:
+
+- Read the [issues](https://github.com/mmm1513/pyminio/issues), Fork the [project](https://github.com/mmm1513/pyminio) and do a Pull Request.
+- Request a new topic creating a `New issue` with the `enhancement` tag.
+- Find any kind of errors in the code and create a `New issue` with the details and the `bug enhancement` or fork the project and do a Pull Request.
+- Suggest a better or more pythonic way for existing examples.
+
+### Work environment:
+
+After forking the project and installing the dependencies,
+download the [minio docker](https://hub.docker.com/r/minio/minio/) and start an instance in your computer for development and testing.
+#### Dont forget to write tests, and to run all the tests before making a pull request.
