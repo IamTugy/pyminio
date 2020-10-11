@@ -75,13 +75,13 @@ def test_exists(client):
             'baz1': [],
             'baz2': [],
         }
-    },
+    }
 })
 def test_listdir(client):
     assert set(client.listdir('/')) == {'foo1/', 'foo2/', 'foo3/'}
-    assert client.listdir('/foo1/') == ['bar/']
-    assert client.listdir('/foo2/') == ['bar/']
-    assert client.listdir('/foo2/bar/') == ['baz']
+    assert set(client.listdir('/foo1/')) == {'bar/'}
+    assert set(client.listdir('/foo2/')) == {'bar/'}
+    assert set(client.listdir('/foo2/bar/')) == {'baz'}
     assert set(client.listdir('/foo3/bar/')) == {'baz1/', 'baz2/'}
 
 
@@ -102,12 +102,38 @@ def test_listdir(client):
         }
     }
 })
-def test_listdir_only_files(client):
-    assert client.listdir('/', only_files=True) == []
-    assert client.listdir('/foo1/', only_files=True) == []
-    assert client.listdir('/foo2/', only_files=True) == []
-    assert client.listdir('/foo2/bar/', only_files=True) == ['baz2']
-    assert client.listdir('/foo3/bar/', only_files=True) == []
+def test_listdir_files_only(client):
+    assert set(client.listdir('/', files_only=True)) == set()
+    assert set(client.listdir('/foo1/', files_only=True)) == set()
+    assert set(client.listdir('/foo2/', files_only=True)) == set()
+    assert set(client.listdir('/foo2/bar/', files_only=True)) == {'baz2'}
+    assert set(client.listdir('/foo3/bar/', files_only=True)) == set()
+
+
+@mock_fs({
+    'foo1': {
+        'bar': [],
+    },
+    'foo2': {
+        'bar': {
+            'baz1': [],
+            'baz2': None,
+        }
+    },
+    'foo3': {
+        'bar': {
+            'baz1': [],
+            'baz2': [],
+        }
+    }
+})
+def test_listdir_dirs_only(client):
+    assert set(client.listdir('/')) == {'foo1/', 'foo2/', 'foo3/'}
+    assert set(client.listdir('/foo1/', dirs_only=True)) == {'bar/'}
+    assert set(client.listdir('/foo2/', dirs_only=True)) == {'bar/'}
+    assert set(client.listdir('/foo2/bar/', dirs_only=True)) == {'baz1/'}
+    assert set(client.listdir('/foo3/bar/', dirs_only=True)) == {'baz1/',
+                                                                 'baz2/'}
 
 
 @mock_fs({
@@ -243,6 +269,7 @@ def test_cp(client):
     client.cp('/foo/bar2/', '/foo/bar1/', recursive=True)
     assert client.exists('/foo/bar1/bar2/baz')
 
+
 @mock_fs({
     'foo': {
         'bar1': [],
@@ -284,7 +311,6 @@ def test_recursive_mv_buckets(client):
     assert client.exists('/foo3/foo2/bar/')
     assert client.exists('/foo3/foo2/bar/baz1/')
     assert client.exists('/foo3/foo2/bar/baz2')
-
 
 
 @mock_fs({
