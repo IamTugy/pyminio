@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from io import BytesIO
+from collections import deque
 from datetime import datetime
 from dataclasses import dataclass
 from typing import List, Dict, Any
@@ -283,12 +284,13 @@ class Pyminio:
         match = Match(path)
         return self.exists(path) and match.is_dir()
 
-    def truncate(self):
+    def truncate(self) -> Pyminio:
         for bucket in self.listdir(ROOT):
             self.rmdir(join(ROOT, bucket), recursive=True)
+        return self
 
     @_validate_directory
-    def rmdir(self, path: str, recursive: bool = False):
+    def rmdir(self, path: str, recursive: bool = False) -> Pyminio:
         """Remove specified directory.
 
         If recursive flag is used, remove all content recursively
@@ -304,12 +306,12 @@ class Pyminio:
             if recursive:
                 return self.truncate()
             raise DirectoryNotEmptyError("can not recursively delete "
-                                         "unempty directory")
+                                         "non-empty directory")
 
-        dirs_to_delete = [path]
+        dirs_to_delete = deque([path])
 
         while len(dirs_to_delete):
-            current_dir_match = Match(dirs_to_delete.pop(0))
+            current_dir_match = Match(dirs_to_delete.popleft())
             objects_in_directory = self._get_objects_at(current_dir_match)
             files = []
             dirs = []
@@ -317,7 +319,7 @@ class Pyminio:
             if len(objects_in_directory) > 0:
                 if not recursive:
                     raise DirectoryNotEmptyError("can not recursively delete "
-                                                 "unempty directory")
+                                                 "non-empty directory")
 
                 for obj in objects_in_directory:
                     if obj.is_dir:
@@ -329,7 +331,7 @@ class Pyminio:
                     # list activates remove
                     list(self.minio_obj.remove_objects(match.bucket, files))
 
-                dirs_to_delete += dirs
+                dirs_to_delete.extend(dirs)
 
             if len(dirs) == 0 and not current_dir_match.is_bucket():
                 self.minio_obj.remove_object(current_dir_match.bucket,
@@ -341,9 +343,10 @@ class Pyminio:
 
             except BucketNotEmpty:
                 raise DirectoryNotEmptyError("can not recursively delete "
-                                             "unempty directory")
+                                             "non-empty directory")
+        return self
 
-    def rm(self, path: str, recursive: bool = False):
+    def rm(self, path: str, recursive: bool = False) -> Pyminio:
         """Remove specified directory or file.
 
         If recursive flag is used, remove all content recursively.
@@ -358,6 +361,7 @@ class Pyminio:
 
         match = Match(path)
         self.minio_obj.remove_object(match.bucket, match.relative_path)
+        return self
 
     def _get_destination(self, from_path: str, to_path: str):
         from_match = Match(from_path)
@@ -378,7 +382,7 @@ class Pyminio:
         return to_match
 
     @_validate_directory
-    def copy_recursively(self, from_path: str, to_path: str):
+    def copy_recursively(self, from_path: str, to_path: str) -> Pyminio:
         """Copy recursively the content of from_path, to to_path.
 
         If you acctually wanted to copy from_path as a folder,
@@ -391,10 +395,10 @@ class Pyminio:
             recursive: copy content recursively.
         """
         files_to_copy = []
-        dirs_to_copy = [from_path]
+        dirs_to_copy = deque([from_path])
 
         while len(dirs_to_copy) > 0:
-            current_dir_match = Match(dirs_to_copy.pop(0))
+            current_dir_match = Match(dirs_to_copy.popleft())
             objects_in_directory = self._get_objects_at(current_dir_match)
             dirs = []
 
@@ -412,15 +416,14 @@ class Pyminio:
                 self.mkdirs(join(
                     to_path, current_dir_match.path.replace(from_path, '')))
 
-            dirs_to_copy += dirs
+            dirs_to_copy.extend(dirs)
 
         for obj_to_copy in files_to_copy:
-            self.cp(
-                from_path=obj_to_copy.from_path,
-                to_path=obj_to_copy.to_path
-            )
+            self.cp(**obj_to_copy)
 
-    def cp(self, from_path: str, to_path: str, recursive: bool = False):
+        return self
+
+    def cp(self, from_path: str, to_path: str, recursive: bool = False) -> Pyminio:
         """Copy files from one directory to another.
 
         If to_path will be a path to a dictionary, the name will be
@@ -439,8 +442,7 @@ class Pyminio:
 
         if from_match.is_dir():
             if recursive:
-                self.copy_recursively(from_match.path, to_match.path)
-                return
+                return self.copy_recursively(from_match.path, to_match.path)
 
             else:
                 raise ValueError(
@@ -449,8 +451,9 @@ class Pyminio:
         self.minio_obj.copy_object(to_match.bucket, to_match.relative_path,
                                    join(from_match.bucket,
                                         from_match.relative_path))
+        return self
 
-    def mv(self, from_path: str, to_path: str, recursive: bool = False):
+    def mv(self, from_path: str, to_path: str, recursive: bool = False) -> Pyminio:
         """Move files from one directory to another.
 
         Works like linux's mv.
@@ -466,6 +469,7 @@ class Pyminio:
         finally:
             if(self.exists(from_path) and self.exists(to_match.path)):
                 self.rm(from_path, recursive)
+        return self
 
     def get(self, path: str) -> ObjectData:
         """Get file or directory from minio.
