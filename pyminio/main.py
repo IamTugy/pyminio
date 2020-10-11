@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 
-from os import environ
 from io import BytesIO
 from datetime import datetime
 from dataclasses import dataclass
@@ -223,14 +222,16 @@ class Pyminio:
                 for key, value in detailed_metadata.items()}
 
     @_validate_directory
-    def listdir(self, path: str, only_files: bool = False) -> List[str]:
+    def listdir(self, path: str, files_only: bool = False,
+                dirs_only: bool = False) -> Tuple[str]:
         """Return all files and directories within the directory path.
 
         Works like os.listdir.
 
         Args:
             path: path of a directory.
-            only_files: return only files name and not directories.
+            files_only: return only files name and not directories.
+            dirs_only: return only directories name and not files.
 
         Returns:
             files and directories in path.
@@ -238,14 +239,15 @@ class Pyminio:
         match = Match(path)
 
         if match.is_root():
-            if only_files:
+            if files_only:
                 return []
 
-            return [f"{b.name}/" for b in self._get_buckets()]
+            return tuple(f"{b.name}/" for b in self._get_buckets())
 
-        return [obj.object_name.replace(match.prefix, '')
-                for obj in self._get_objects_at(match)
-                if not only_files or not obj.is_dir]
+        return tuple(obj.object_name.replace(match.prefix, '')
+                     for obj in self._get_objects_at(match)
+                     if not (files_only and obj.is_dir or
+                             dirs_only and not obj.is_dir))
 
     def exists(self, path: str) -> bool:
         """Check if the specified path exists.
@@ -304,14 +306,14 @@ class Pyminio:
             if recursive:
                 return self.truncate()
             raise DirectoryNotEmptyError("can not recursively delete "
-                                         "unempty directory")
+                                         "non-empty directory")
 
         objects_in_directory = self._get_objects_at(match)
 
         if len(objects_in_directory) > 0:
             if not recursive:
                 raise DirectoryNotEmptyError("can not recursively delete "
-                                             "unempty directory")
+                                             "non-empty directory")
 
             files = [file_obj.object_name
                      for file_obj in objects_in_directory
@@ -332,7 +334,7 @@ class Pyminio:
 
             except BucketNotEmpty:
                 raise DirectoryNotEmptyError("can not recursively delete "
-                                             "unempty directory")
+                                             "non-empty directory")
 
         else:
             self.minio_obj.remove_object(match.bucket, match.prefix)
@@ -503,22 +505,22 @@ class Pyminio:
         )
         data_file.close()
 
-    def put_file(self, path: str, file_path: str, metadata: Dict = None):
+    def put_file(self, file_path: str, to_path: str, metadata: Dict = None):
         """Put file inside a minio folder.
 
-        If file_path will be a path to a dictionary, the name will be
-        the copied file name. if it will be a path with a file name,
-        the name of the file will be this file's name.
+        If file_path will be a path to a file, the name will be
+        the to_path if it will be a path with a file name,
+        if not, the name of the file will be this file's name.
 
         Args:
-            path: destination of the new file in minio.
             file_path: the path to the file.
+            to_path: destination of the new file in minio.
             metadata: metadata dictionary to append the file.
         """
-        match = Match(path)
+        match = Match(to_path)
 
         if match.is_dir():
-            match = Match(join(path, basename(file_path)))
+            match = Match(join(to_path, basename(file_path)))
 
         self.minio_obj.fput_object(match.bucket, match.relative_path,
                                    file_path, metadata=metadata)
@@ -531,7 +533,7 @@ class Pyminio:
             path: path of a directory.
         """
         match = Match(path)
-        objects_names_in_dir = self.listdir(path, only_files=True)
+        objects_names_in_dir = self.listdir(path, files_only=True)
         if len(objects_names_in_dir) == 0:
             return None
 

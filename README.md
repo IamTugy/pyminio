@@ -1,114 +1,133 @@
 # Pyminio
-Minio is a python client wrapped like os to control minio server.
-
 [![PyPI](https://img.shields.io/pypi/v/pyminio?color=blue&label=pypi%20version)]()
 [![PyPI](https://img.shields.io/pypi/pyversions/pyminio.svg?style=plastic)]()
 [![Downloads](https://pepy.tech/badge/pyminio)](https://pepy.tech/project/pyminio)
+#### Pyminio is a python client wrapped like the `os` module to control minio server.
+
+I have developed pyminio while trying to work with the minio's original python client with a lot of struggles. I had to read and understand minio's implementations to preform the most simple tasks.
+
+Pyminio is a wrapper to minio, that is more indecative for the user.
+It works like `os` module, so you don't need to understand minio's concepts, and just using regular paths.
 
 ## Content
 1. [Installation](#Installation)
 2. [Setting up Pyminio](#Setting-up-Pyminio)
 3. [Usage](#Usage)
-   - [mkdirs](#mkdirs)
-   - [listdir](#listdir)
-   - [exists](#exists)
-   - [isdir](#isdir)
-   - [truncate](#truncate)
-   - [rmdir](#rmdir)
-   - [rm](#rm)
-   - [cp](#cp)
-   - [mv](#mv)
-   - [get](#get)
-   - [get_last_object](#get_last_object)
-   - [put_data](#put_data)
-   - [put_file](#put_file)
 4. [Contribute](#Contribute)
 
 ## Installation
 Use the package manager [pip](https://pypi.org/project/pyminio/) to install pyminio.
+
 ```bash
 pip install pyminio
 ```
-
-## Setting up Pyminio:
-In case you want to add your own minio object you can pass it in the constructor like so:
-
-```python
-from minio import Minio
-from pyminio import Pyminio
-
-ENDPOINT = environ.get('MINIO_CONNECTION')
-ACCESS_KEY = environ.get('MINIO_ACCESS_KEY')
-SECRET_KEY = environ.get('MINIO_SECRET_KEY')
-
-minio_obj = Minio(
-            endpoint=self.ENDPOINT,
-            access_key=self.ACCESS_KEY,
-            secret_key=self.SECRET_KEY
-        )
-pyminio_client = Pyminio(minio_obj=minio_obj)
+or
+```bash
+git clone https://github.com/mmm1513/pyminio.git
+cd pyminio
+python setup.py install
 ```
 
-if you dont want to handle with minio, you cand do this instead:
+## Setting up Pyminio
 
-```python
-from pyminio import Pyminio
+Firstly you need to set up your  [Minio Docker](https://hub.docker.com/r/minio/minio/), and acquire an ENDPOINT (URL), ACCESS_KEY, and a SECRET_KEY.
 
-ENDPOINT = environ.get('MINIO_CONNECTION')
-ACCESS_KEY = environ.get('MINIO_ACCESS_KEY')
-SECRET_KEY = environ.get('MINIO_SECRET_KEY')
+- If you want to add your own minio object you can pass it in the constructor like so:
 
-pyminio_client = Pyminio.from_credentials(
-    endpoint=self.ENDPOINT,
-    access_key=self.ACCESS_KEY,
-    secret_key=self.SECRET_KEY
-)
-```
+    Install python's [Minio](https://docs.min.io/docs/python-client-quickstart-guide.html) module.
 
-You can storage your minio credentials in environment varibles like in these examples or pass them to Pyminio in any other way.
+    ```python
+    from minio import Minio
+    from pyminio import Pyminio
 
-## Usage:
+    minio_obj = Minio(
+        endpoint='<your-minio-endpoint>',  # e.g. "localhost:9000/"
+        access_key='<your-minio-access-key>',
+        secret_key='<your-minio-secret-key>'
+    )
+    pyminio_client = Pyminio(minio_obj=minio_obj)
+    ```
 
-### mkdirs
-Pyminio.mkdirs will create the given full path if not exists like linux's 'mkdir -p'.
+- If you don't want to handle with minio, you can do this instead:
 
-This function must get a directory path or it will raise a ValueError.
+    ```python
+    from pyminio import Pyminio
+
+    pyminio_client = Pyminio.from_credentials(
+        endpoint='<your-minio-endpoint>',  # e.g. "localhost:9000/"
+        access_key='<your-minio-access-key>',
+        secret_key='<your-minio-secret-key>'
+    )
+    ```
+
+## Usage
+- [mkdirs](#self.mkdirs(...))
+- [listdir](#self.listdir(...))
+- [exists](#self.exists(...))
+- [isdir](#self.isdir(...))
+- [truncate](#self.truncate())
+- [rmdir](#self.rmdir(...))
+- [rm](#self.rm(...))
+- [cp](#self.cp(...))
+- [mv](#self.mv(...))
+- [get](#self.get(...))
+- [get_last_object](#self.get_last_object(...))
+- [put_data](#self.put_data(...))
+- [put_file](#self.put_file(...))
+
+### self.mkdirs(...)
+`Pyminio.mkdirs` will create the given full path if not exists like linux's `mkdir -p`.
+
+This method must get a directory path or it will raise a ValueError.
 
 ```python
 >>> pyminio_client.mkdirs('/foo/bar/baz/')
+>>> pyminio_client.mkdirs('/foo/bar/baz')
+ValueError /foo/bar/baz is not a valid directory path. must be absolute and end with /
 ```
 
-### listdir
-Pyminio.listdir will return the directory's content as a list of directorys and files name. Works like os's 'listdir'.
+### self.listdir(...)
+`Pyminio.listdir` will return the directory's content as a tuple of directories and file names. Works like os's `listdir`.
 
-This function must get a directory path or it will raise a ValueError.
+This method must get a directory path or it will raise a ValueError.
 
 ```python
 >>> pyminio_client.listdir('/foo/bar/baz/')
-['file_name_1', 'file_name_2', 'directory_name/']
+('file_name_1', 'file_name_2', 'directory_name/')
 ```
 
-There is an option to use the only_files flag to get only files from listdir.
+There is an option to use the files_only flag to get only files and dirs_only to get only directories from listdir.
 
 ```python
->>> pyminio_client.listdir('/foo/bar/baz/', only_files=True)
-['file_name_1', 'file_name_2']
+>>> pyminio_client.listdir('/foo/bar/baz/', files_only=True)
+('file_name_1', 'file_name_2')
+>>> pyminio_client.listdir('/foo/bar/baz/', dirs_only=True)
+('directory_name/')
 ```
 
-### exists
-Pyminio.exists will return a boolean that confirm reather this path exists or not in the server. Works like os.path.exists.
+### self.exists(...)
+`Pyminio.exists` will return a boolean that confirm rather this path exists or not in the server. Works like os's `path.exists`.
+
+```bash
+/
+├── foo
+│   └── bar
+│       └── baz
+│           ├── file_name_1
+│           └── file_name_2
+```
 
 ```python
->>> pyminio_client.exists('/foo/bar/baz/file_name_1')  # existed file
+>>> pyminio_client.exists('/foo/bar/baz/file_name_1')
 True
->>> pyminio_client.exists('/foo/bar/baz/file_name_3')  # not existed file
+>>> pyminio_client.exists('/foo/bar/baz/file_name_3')
 False
->>> pyminio_client.exists('/all/path/wrong/')  # not existed path
+>>> pyminio_client.exists('/all/path/wrong/')  # not existing path
 False
 ```
 
-### isdir
-Pyminio.isdir will return True only if the given path exists and is a directory. Works like os.path.isdir
+### self.isdir(...)
+`Pyminio.isdir` will return True only if the given path exists and is a directory. Works like `os.path.isdir`.
 
 ```python
 >>> pyminio_client.isdir('/foo/bar/baz/file_name_1')  # existed file
@@ -119,44 +138,44 @@ True
 False
 ```
 
-### truncate
-Pyminio.truncate will delete all minio's content.
+### self.truncate()
+`Pyminio.truncate` will delete all minio's content from the root directory.
 
 ```python
 >>> pyminio_client.truncate()
 ```
 
-### rmdir
-Pyminio.rmdir will delete the specified directory. Works like linux's 'rmdir (-r)'.
+### self.rmdir(...)
+`Pyminio.rmdir` will delete the specified directory. Works like linux's `rmdir` / `rm (-r)`.
 
-It will raise a DirectoryNotEmptyError if given directory is not empty, except if the recursive flag is on and then it will delete given directory's path recursively.
+It will raise a `DirectoryNotEmptyError` if given directory is not empty, except if the recursive flag is set and then it will delete given directory's path recursively.
 
-This function must get a directory path or it will raise a ValueError.
+This method must get a directory path or it will raise a ValueError.
 
 ```python
 >>> pyminio_client.rmdir('/foo/bar/baz/directory_name/')  # empty directory
->>> pyminio_client.rmdir('/foo/bar/')  # unempty directory
-DirectoryNotEmptyError: can not recursively delete unempty directory
+>>> pyminio_client.rmdir('/foo/bar/')  # non-empty directory
+DirectoryNotEmptyError: can not recursively delete non-empty directory
 >>> pyminio_client.rmdir('/foo/bar/', recursive=True)
 ```
 
-### rm
-Pyminio.rm works like [rmdir](#rmdir) only that it can delete files too. Works like linux's rm (-r).
+### self.rm(...)
+`Pyminio.rm` works like [rmdir](#rmdir) only that it can delete files too. Works like linux's `rm (-r)`.
 
 ```python
 >>> pyminio_client.rm('/foo/bar/baz/file_name')
 ```
 
-### cp
-Pyminio.cp will copy one file or directory to given destination. Works like linux's 'cp (-r)'.
+### self.cp(...)
+`Pyminio.cp` will copy one file or directory to given destination. Works like linux's `cp (-r)`.
 
-This func can only copy recursively when the recursive flag is True. If not, it will raise a ValueError.
+This method can only copy recursively when the recursive flag is True. If not, it will raise a ValueError.
 
-#### How will the copy accure? (all directories are copied recursively in this examples)
+### How will the copy accure? (all directories are copied recursively in this examples)
 | src path   | dst path  | dst exists | new dst      | Explain                                                                |
 | ---------- | --------- | ---------- | ------------ | ---------------------------------------------------------------------- |
-| /foo/bar   | /foo/baz  |    ---     | /foo/baz     | The file's name will be changed from bar to baz.                       |
-| /foo1/bar  | /foo2/    |    True    | /foo/bar     | The file will be copied to '/foo2/'                                    |
+| /foo/bar   | /foo/baz  |    ---     | /foo/baz     | The file's name will be copied from bar to baz as well.                |
+| /foo1/bar  | /foo2/    |    True    | /foo/bar     | The file will be copied to '/foo2/bar'                                 |
 | /foo/bar/  | /foo/     |    True    | /foo/        | The content of '/foo/bar/' will be copied to '/foo/'                   |
 | /foo1/bar/ | /foo2/    |   False    | /foo2/bar/   | '/foo1/bar/' will be copied recursively to '/foo2/bar/'                |
 | /foo1/bar/ | /foo2/baz |    ---     |     ---      | ValueError will be raised in attempting to copy directory in to a file |
@@ -170,38 +189,53 @@ This func can only copy recursively when the recursive flag is True. If not, it 
 ValueError: can not activate this method from directory to a file.
 ```
 
-### mv
-Pyminio.mv works like [cp](#cp) only that it remove the source after complete the transfare. Works like linux's 'mv (-r)'.
+### self.mv(...)
+`Pyminio.mv` works like [cp](#cp) only that it removes the source after the transfer has been completed. Works like linux's `mv`.
 
-This func can only move recursively when the recursive flag is True. If not, it will raise a ValueError.
+This method can only move recursively when the recursive flag is True. If not, it will raise a ValueError.
 
 ```python
 >>> pyminio_client.mv('/foo/bar/', '/foo/baz/')
 ```
 
-### get
-Pyminio.get return an object from given path. This object will return as a pyminio.File object or an pyminio.Folder object, that both inherit from pyminio.ObjectData
+### self.get(...)
+`Pyminio.get` return an object from given path. This object will be returned as a `pyminio.File` object or an `pyminio.Folder` object, that both inherit from `pyminio.ObjectData`.
 
 This objects will contain metadata, their path and name.
-If its a File object it will contains it's data.
 
 ```python
 >>> pyminio_client.get('/foo/bar/baz')
-File(name='baz', full_path='/foo/bar/baz', metadata=AttrDict({'is_dir': False, 'last_modified': time.struct_time(...), 'size': ..., 'content-type': ...}), data=...)
+File(name='baz', 
+     full_path='/foo/bar/baz', 
+     metadata=AttrDict({
+         'is_dir': False, 
+         'last_modified': time.struct_time(...), 
+         'size': ..., 
+         'content-type': ...
+     }), 
+     data=...)
 ```
 
-### get_last_object
-Pyminio.get_last_object will return the last modified object inside a given directory.
+### self.get_last_object(...)
+`Pyminio.get_last_object` will return the last modified object inside a given directory.
 
-This function must get a directory path or it will raise a ValueError.
+This method must get a directory path or it will raise a ValueError.
 
 ```python
 >>> pyminio_client.get_last_object('/foo/bar/')
-File(name='baz', full_path='/foo/bar/baz', metadata=AttrDict({'is_dir': False, 'last_modified': time.struct_time(...), 'size': ..., 'content-type': ...}), data=...)
+File(name='baz', 
+     full_path='/foo/bar/baz', 
+     metadata=AttrDict({
+         'is_dir': False, 
+         'last_modified': time.struct_time(...), 
+         'size': ..., 
+         'content-type': ...
+     }), 
+     data=...)
 ```
 
-### put_data
-Pyminio.put_data gets a path, data in bytes, and some metadata, and create an object inside the given path.
+### self.put_data(...)
+`Pyminio.put_data` gets a path, data in bytes, and some metadata, and create an object inside the given path.
 
 ```python
 >>> data = b'test'
@@ -209,25 +243,30 @@ Pyminio.put_data gets a path, data in bytes, and some metadata, and create an ob
 >>> pyminio_client.put_data(path='/foo/bar/baz', data=data, metadata=metadata)
 ```
 
-### put_file
-Pyminio.put_file works like [put_data](#put_data) only that instead of data it gets a path to a file in you computer. Then it will copy this file to the given location.
+### self.put_file(...)
+`Pyminio.put_file` works like [put_data](#put_data) only that instead of data it gets a path to a file in you computer. Then it will copy this file to the given location.
 
 ```python
 >>> metadata = {'Pyminio-is': 'Awesome'}
->>> pyminio_client.put_data(path='/foo/bar/baz', file_path='/mnt/some_file', metadata=metadata)
+>>> pyminio_client.put_file(to_path='/foo/bar/baz', file_path='/mnt/some_file', metadata=metadata)
 ```
 
 ## Contribute
 
 All contributions are welcome:
 
-- Read the [issues](https://github.com/mmm1513/pyminio/issues), Fork the [project](https://github.com/mmm1513/pyminio) and do a Pull Request.
-- Request a new topic creating a `New issue` with the `enhancement` tag.
-- Find any kind of errors in the code and create a `New issue` with the details and the `bug enhancement` or fork the project and do a Pull Request.
+- Read the [issues](https://github.com/mmm1513/pyminio/issues), Fork the [project](https://github.com/mmm1513/pyminio) and create a new Pull Request.
+- Request a new feature creating a `New issue` with the `enhancement` tag.
+- Find any kind of errors in the code and create a `New issue` with the details, or fork the project and do a Pull Request.
 - Suggest a better or more pythonic way for existing examples.
 
-### Work environment:
+### Work environment
 
-After forking the project and installing the dependencies,
+After forking the project and installing the dependencies, (like specified in the [installations](#Installation) in part 2)
 download the [minio docker](https://hub.docker.com/r/minio/minio/) and start an instance in your computer for development and testing.
-#### Dont forget to write tests, and to run all the tests before making a pull request.
+
+to run the tests run:
+```bash
+pytest -v tests/tests.py
+```
+#### Don't forget to write tests, and to run all the tests before making a pull request.
