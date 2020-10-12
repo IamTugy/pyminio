@@ -243,7 +243,6 @@ def test_cp(client):
     client.cp('/foo/bar2/', '/foo/bar1/', recursive=True)
     assert client.exists('/foo/bar1/bar2/baz')
 
-
 @mock_fs({
     'foo': {
         'bar1': [],
@@ -263,6 +262,29 @@ def test_mv(client):
     client.mv('/foo/', '/foo1/', recursive=True)
     assert client.exists('/foo1/bar1/bar2/baz')
     assert not client.exists('/foo/')
+
+
+@mock_fs({
+    'foo1': {
+        'bar': {
+            'baz1': [],
+            'baz2': None,
+        }
+    },
+    'foo3': []
+})
+def test_recursive_mv_buckets(client):
+    client.mv('/foo1/', '/foo2/', recursive=True)
+    assert not client.exists('/foo1/')
+    assert client.exists('/foo2/bar/baz1/')
+    assert client.exists('/foo2/bar/baz2')
+
+    client.mv('/foo2/', '/foo3/', recursive=True)
+    assert not client.exists('/foo2/')
+    assert client.exists('/foo3/foo2/bar/')
+    assert client.exists('/foo3/foo2/bar/baz1/')
+    assert client.exists('/foo3/foo2/bar/baz2')
+
 
 
 @mock_fs({

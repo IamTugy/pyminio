@@ -423,7 +423,8 @@ class Pyminio:
 
         return self
 
-    def cp(self, from_path: str, to_path: str, recursive: bool = False) -> Pyminio:
+    def cp(self, from_path: str, to_path: str,
+           recursive: bool = False) -> Pyminio:
         """Copy files from one directory to another.
 
         If to_path will be a path to a dictionary, the name will be
@@ -453,7 +454,8 @@ class Pyminio:
                                         from_match.relative_path))
         return self
 
-    def mv(self, from_path: str, to_path: str, recursive: bool = False) -> Pyminio:
+    def mv(self, from_path: str, to_path: str,
+           recursive: bool = False) -> Pyminio:
         """Move files from one directory to another.
 
         Works like linux's mv.
