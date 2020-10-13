@@ -1,125 +1,18 @@
-from __future__ import annotations
 
-import re
 
 from io import BytesIO
 from collections import deque
 from datetime import datetime
-from dataclasses import dataclass
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Tuple
 from os.path import join, basename, dirname, normpath
 
 import pytz
-from cached_property import cached_property
-from minio import Minio, definitions
 from attrdict import AttrDict
+from minio import Minio, definitions
 from minio.error import NoSuchKey, BucketNotEmpty
 
 from .exceptions import DirectoryNotEmptyError
-
-ROOT = "/"
-
-
-@dataclass
-class ObjectData:
-    name: str
-    full_path: str
-    metadata: Dict[str, Any]
-
-
-@dataclass
-class File(ObjectData):
-    data: bytes
-
-
-@dataclass
-class Folder(ObjectData):
-    pass
-
-
-class Match:
-    PATH_STRUCTURE = \
-        re.compile(r"/(?P<bucket>.*?)/+(?P<prefix>.*/+)?(?P<filename>.+[^/])?")
-
-    def __init__(self, path: str):
-        self._path = path
-        self._match = self._get_match()
-
-    @cached_property
-    def path(self):
-        return re.sub(r'/+', r'/', self._path)
-
-    @property
-    def bucket(self):
-        return self._match.bucket
-
-    @property
-    def prefix(self):
-        return self._match.prefix
-
-    @property
-    def filename(self):
-        return self._match.filename
-
-    def _get_match(self) -> AttrDict:
-        """Get the bucket name, path prefix and file's name from path."""
-        if self.is_root():
-            return AttrDict(bucket='', prefix='', filename='')
-
-        match = self.PATH_STRUCTURE.match(self.path)
-
-        if match is None:
-            raise ValueError(f'{self.path} is not a valid path')
-
-        return AttrDict(
-            bucket=match.group("bucket"),
-            prefix=match.group("prefix") or '',
-            filename=match.group("filename") or ''
-        )
-
-    def is_root(self):
-        return self.path == ROOT
-
-    @property
-    def relative_path(self):
-        return join(self.prefix, self.filename)
-
-    def is_bucket(self):
-        return self.relative_path == ''
-
-    def is_dir(self):
-        return self.filename == ''
-
-    def is_file(self):
-        return not self.is_dir()
-
-    @classmethod
-    def infer_operation_destination(cls, src: Match, dst: Match) -> Match:
-        """Return a match with the dst path and filename if exists.
-        If not, return dst path with src filename.
-
-        Examples:
-            >>> src = Match('/foo/bar1/baz')
-            >>> dst = Match('/foo/bar2/')
-            >>> Match.infer_file_operation_destination(src, dst)
-            Match('/foo/bar2/baz')
-
-            >>> src = Match('/foo/bar1/baz')
-            >>> dst = Match('/foo/bar2/baz2')
-            >>> Match.infer_file_operation_destination(src, dst)
-            Match('/foo/bar2/baz2')
-
-        Raises:
-            ValueError: If src was not a valid file match.
-        """
-        if not src.is_file():
-            raise ValueError('Src must be a valid match to a file')
-
-        if dst.is_file():
-            return dst
-
-        else:
-            return Match(join(dst.path, src.filename))
+from .structures import Match, ObjectData, File, Folder, ROOT
 
 
 def _validate_directory(func):
@@ -127,7 +20,7 @@ def _validate_directory(func):
     def decorated_method(self, path: str, *args, **kwargs):
         match = Match(path)
         if match.is_file():
-            raise ValueError(f"{path} is not a valid directory path."
+            raise ValueError(f"{path!r} is not a valid directory path."
                              " must be absolute and end with /")
 
         return func(self, path, *args, **kwargs)
@@ -162,7 +55,7 @@ class Pyminio:
         access_key: str,
         secret_key: str,
         **kwargs
-    ) -> Pyminio:
+    ) -> 'Pyminio':
         return cls(minio_obj=Minio(endpoint=endpoint,
                                    access_key=access_key,
                                    secret_key=secret_key,
@@ -180,7 +73,7 @@ class Pyminio:
         match = Match(path)
 
         if match.is_root():
-            raise ValueError("cannot create / directory")
+            raise ValueError("cannot create '/' directory")
 
         #  make bucket
         if not self.minio_obj.bucket_exists(bucket_name=match.bucket):
@@ -241,7 +134,7 @@ class Pyminio:
 
         if match.is_root():
             if files_only:
-                return []
+                return tuple()
 
             return tuple(f"{b.name}/" for b in self._get_buckets())
 
@@ -286,13 +179,13 @@ class Pyminio:
         match = Match(path)
         return self.exists(path) and match.is_dir()
 
-    def truncate(self) -> Pyminio:
+    def truncate(self) -> 'Pyminio':
         for bucket in self.listdir(ROOT):
             self.rmdir(join(ROOT, bucket), recursive=True)
         return self
 
     @_validate_directory
-    def rmdir(self, path: str, recursive: bool = False) -> Pyminio:
+    def rmdir(self, path: str, recursive: bool = False) -> 'Pyminio':
         """Remove specified directory.
 
         If recursive flag is used, remove all content recursively
@@ -351,7 +244,7 @@ class Pyminio:
 
         return self
 
-    def rm(self, path: str, recursive: bool = False) -> Pyminio:
+    def rm(self, path: str, recursive: bool = False) -> 'Pyminio':
         """Remove specified directory or file.
 
         If recursive flag is used, remove all content recursively.
@@ -387,7 +280,7 @@ class Pyminio:
         return to_match
 
     @_validate_directory
-    def copy_recursively(self, from_path: str, to_path: str) -> Pyminio:
+    def copy_recursively(self, from_path: str, to_path: str) -> 'Pyminio':
         """Copy recursively the content of from_path, to to_path.
 
         If you acctually wanted to copy from_path as a folder,
@@ -429,7 +322,7 @@ class Pyminio:
         return self
 
     def cp(self, from_path: str, to_path: str,
-           recursive: bool = False) -> Pyminio:
+           recursive: bool = False) -> 'Pyminio':
         """Copy files from one directory to another.
 
         If to_path will be a path to a dictionary, the name will be
@@ -460,7 +353,7 @@ class Pyminio:
         return self
 
     def mv(self, from_path: str, to_path: str,
-           recursive: bool = False) -> Pyminio:
+           recursive: bool = False) -> 'Pyminio':
         """Move files from one directory to another.
 
         Works like linux's mv.
@@ -514,7 +407,7 @@ class Pyminio:
                 return_obj = Folder
 
         except (NoSuchKey, StopIteration):
-            raise ValueError(f"cannot access {path}: "
+            raise ValueError(f"cannot access {path!r}: "
                              "No such file or directory")
 
         details_metadata = \
@@ -559,7 +452,7 @@ class Pyminio:
         if not, the name of the file will be this file's name.
 
         Args:
-            file_path: the path to the file.
+            file_path: the path to the file in local disk.
             to_path: destination of the new file in minio.
             metadata: metadata dictionary to append the file.
         """

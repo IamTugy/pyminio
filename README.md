@@ -61,21 +61,21 @@ Firstly you need to set up your  [Minio Docker](https://hub.docker.com/r/minio/m
     ```
 
 ## Usage
-- [mkdirs](#self.mkdirs(...))
-- [listdir](#self.listdir(...))
-- [exists](#self.exists(...))
-- [isdir](#self.isdir(...))
-- [truncate](#self.truncate())
-- [rmdir](#self.rmdir(...))
-- [rm](#self.rm(...))
-- [cp](#self.cp(...))
-- [mv](#self.mv(...))
-- [get](#self.get(...))
-- [get_last_object](#self.get_last_object(...))
-- [put_data](#self.put_data(...))
-- [put_file](#self.put_file(...))
+- [mkdirs](#mkdirs)
+- [listdir](#listdir)
+- [exists](#exists)
+- [isdir](#isdir)
+- [truncate](#truncate)
+- [rmdir](#rmdir)
+- [rm](#rm)
+- [cp](#cp)
+- [mv](#mv)
+- [get](#get)
+- [get_last_object](#get_last_object)
+- [put_data](#put_data)
+- [put_file](#put_file)
 
-### self.mkdirs(...)
+### <a name="mkdirs"></a>mkdirs(self, path: str)
 `Pyminio.mkdirs` will create the given full path if not exists like linux's `mkdir -p`.
 
 This method must get a directory path or it will raise a ValueError.
@@ -86,7 +86,7 @@ This method must get a directory path or it will raise a ValueError.
 ValueError /foo/bar/baz is not a valid directory path. must be absolute and end with /
 ```
 
-### self.listdir(...)
+### <a name="listdir"></a>listdir(self, path: str, files_only: bool = False, dirs_only: bool = False) -> Tuple[str]
 `Pyminio.listdir` will return the directory's content as a tuple of directories and file names. Works like os's `listdir`.
 
 This method must get a directory path or it will raise a ValueError.
@@ -102,10 +102,10 @@ There is an option to use the files_only flag to get only files and dirs_only to
 >>> pyminio_client.listdir('/foo/bar/baz/', files_only=True)
 ('file_name_1', 'file_name_2')
 >>> pyminio_client.listdir('/foo/bar/baz/', dirs_only=True)
-('directory_name/')
+('directory_name/', )
 ```
 
-### self.exists(...)
+### <a name="exists"></a>exists(self, path: str) -> bool
 `Pyminio.exists` will return a boolean that confirm rather this path exists or not in the server. Works like os's `path.exists`.
 
 ```bash
@@ -126,7 +126,7 @@ False
 False
 ```
 
-### self.isdir(...)
+### <a name="isdir"></a>isdir(self, path: str)
 `Pyminio.isdir` will return True only if the given path exists and is a directory. Works like `os.path.isdir`.
 
 ```python
@@ -138,14 +138,14 @@ True
 False
 ```
 
-### self.truncate()
+### <a name="truncate"></a>truncate(self) -> Pyminio
 `Pyminio.truncate` will delete all minio's content from the root directory.
 
 ```python
 >>> pyminio_client.truncate()
 ```
 
-### self.rmdir(...)
+### <a name="rmdir"></a>rmdir(self, path: str, recursive: bool = False) -> Pyminio
 `Pyminio.rmdir` will delete the specified directory. Works like linux's `rmdir` / `rm (-r)`.
 
 It will raise a `DirectoryNotEmptyError` if given directory is not empty, except if the recursive flag is set and then it will delete given directory's path recursively.
@@ -159,14 +159,14 @@ DirectoryNotEmptyError: can not recursively delete non-empty directory
 >>> pyminio_client.rmdir('/foo/bar/', recursive=True)
 ```
 
-### self.rm(...)
+### <a name="rm"></a>rm(self, path: str, recursive: bool = False) -> Pyminio
 `Pyminio.rm` works like [rmdir](#rmdir) only that it can delete files too. Works like linux's `rm (-r)`.
 
 ```python
 >>> pyminio_client.rm('/foo/bar/baz/file_name')
 ```
 
-### self.cp(...)
+### <a name="cp"></a>cp(self, from_path: str, to_path: str, recursive: bool = False) -> Pyminio
 `Pyminio.cp` will copy one file or directory to given destination. Works like linux's `cp (-r)`.
 
 This method can only copy recursively when the recursive flag is True. If not, it will raise a ValueError.
@@ -189,7 +189,7 @@ This method can only copy recursively when the recursive flag is True. If not, i
 ValueError: can not activate this method from directory to a file.
 ```
 
-### self.mv(...)
+### <a name="mv"></a>mv(self, from_path: str, to_path: str, recursive: bool = False) -> Pyminio
 `Pyminio.mv` works like [cp](#cp) only that it removes the source after the transfer has been completed. Works like linux's `mv`.
 
 This method can only move recursively when the recursive flag is True. If not, it will raise a ValueError.
@@ -198,7 +198,7 @@ This method can only move recursively when the recursive flag is True. If not, i
 >>> pyminio_client.mv('/foo/bar/', '/foo/baz/')
 ```
 
-### self.get(...)
+### <a name="get"></a>get(self, path: str) -> ObjectData
 `Pyminio.get` return an object from given path. This object will be returned as a `pyminio.File` object or an `pyminio.Folder` object, that both inherit from `pyminio.ObjectData`.
 
 This objects will contain metadata, their path and name.
@@ -216,7 +216,7 @@ File(name='baz',
      data=...)
 ```
 
-### self.get_last_object(...)
+### <a name="get_last_object"></a>get_last_object(self, path: str) -> File
 `Pyminio.get_last_object` will return the last modified object inside a given directory.
 
 This method must get a directory path or it will raise a ValueError.
@@ -234,7 +234,7 @@ File(name='baz',
      data=...)
 ```
 
-### self.put_data(...)
+### <a name="put_data"></a>put_data(self, path: str, data: bytes, metadata: Dict = None)
 `Pyminio.put_data` gets a path, data in bytes, and some metadata, and create an object inside the given path.
 
 ```python
@@ -243,7 +243,7 @@ File(name='baz',
 >>> pyminio_client.put_data(path='/foo/bar/baz', data=data, metadata=metadata)
 ```
 
-### self.put_file(...)
+### <a name="put_file"></a>put_file(self, file_path: str, to_path: str, metadata: Dict = None)
 `Pyminio.put_file` works like [put_data](#put_data) only that instead of data it gets a path to a file in you computer. Then it will copy this file to the given location.
 
 ```python
@@ -267,6 +267,6 @@ download the [minio docker](https://hub.docker.com/r/minio/minio/) and start an 
 
 to run the tests run:
 ```bash
-pytest -v tests/tests.py
+pytest
 ```
 #### Don't forget to write tests, and to run all the tests before making a pull request.
