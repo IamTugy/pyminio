@@ -17,7 +17,8 @@ setuptools.setup(
         'minio <7.0.0, >=6.0.0',
         'pytz',
         'cached-property',
-        'attrdict'
+        'attrdict',
+        'dataclasses'
     ],
     classifiers=[
         "License :: OSI Approved :: MIT License",
