@@ -11,16 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.7, 3.8]
+        python-version: [3.6, 3.7, 3.8]
     
     services:
       minio:
         image: minio/minio
         env:
           MINIO_ACCESS_KEY: administrator
-          MINIO_SECRET_KEY: administrato
-        ports: 
-          - 9000:9000
+          MINIO_SECRET_KEY: administrator
 
     steps:
     - uses: actions/checkout@v2
@@ -40,8 +38,8 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: integration tests
-      run: pytest -v tests/tests.py
+      run: pytest
       env:
-        MINIO_TEST_CONNECTION: localhost:9000
+        MINIO_TEST_CONNECTION: minio:9000
         MINIO_TEST_ACCESS_KEY: administrator
         MINIO_TEST_SECRET_KEY: administrator
