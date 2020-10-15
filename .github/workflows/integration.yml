@@ -22,8 +22,6 @@ jobs:
         env:
           MINIO_ACCESS_KEY: administrator
           MINIO_SECRET_KEY: administrator
-        ports:
-          - 9000:9000
         options: --name minio-server
 
     steps:
@@ -46,6 +44,6 @@ jobs:
     - name: integration tests
       run: pytest
       env:
-        MINIO_TEST_CONNECTION: localhost:9000
+        MINIO_TEST_CONNECTION: minio-server:9000
         MINIO_TEST_ACCESS_KEY: administrator
         MINIO_TEST_SECRET_KEY: administrator
