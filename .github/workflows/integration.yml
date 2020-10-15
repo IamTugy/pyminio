@@ -2,7 +2,7 @@ name: Integration tests and flake8
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, fix-integration-tests-connect-minio ]
   pull_request:
     branches: [ master ]
 
@@ -19,6 +19,8 @@ jobs:
         env:
           MINIO_ACCESS_KEY: administrator
           MINIO_SECRET_KEY: administrator
+        ports:
+          - 9000:9000
 
     steps:
     - uses: actions/checkout@v2
