@@ -17,7 +17,7 @@ jobs:
       minio:
         # Not using official minio image minio/minio because it requires arguments (start /data) 
         # and github actions currently not supporting docker araguments
-        # bitnami/minio image has 1M+ pulls and is up to date
+        # bitnami/minio image has 1M+ pulls and is up to date so it's should be OK to use it
         image: bitnami/minio
         env:
           MINIO_ACCESS_KEY: administrator
