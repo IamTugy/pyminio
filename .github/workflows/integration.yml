@@ -2,7 +2,7 @@ name: Integration tests and flake8
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, fix-integration-tests-connect-minio ]
   pull_request:
     branches: [ master ]
 
