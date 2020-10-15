@@ -21,7 +21,7 @@ jobs:
           MINIO_SECRET_KEY: administrator
         ports:
           - 9000:9000
-         options: server /data
+        options: server /data
 
     steps:
     - uses: actions/checkout@v2
