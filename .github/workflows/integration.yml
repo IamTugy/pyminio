@@ -15,10 +15,16 @@ jobs:
     
     services:
       minio:
-        image: minio/minio
+        # Not using official minio image minio/minio because it requires arguments (start /data) 
+        # and github actions currently not supporting docker araguments
+        # bitnami/minio image has 1M+ pulls and is up to date so it's should be OK to use it
+        image: bitnami/minio
         env:
           MINIO_ACCESS_KEY: administrator
           MINIO_SECRET_KEY: administrator
+        ports:
+          - 9000:9000
+        options: --name minio-server
 
     steps:
     - uses: actions/checkout@v2
@@ -40,6 +46,6 @@ jobs:
     - name: integration tests
       run: pytest
       env:
-        MINIO_TEST_CONNECTION: minio:9000
+        MINIO_TEST_CONNECTION: localhost:9000
         MINIO_TEST_ACCESS_KEY: administrator
         MINIO_TEST_SECRET_KEY: administrator
