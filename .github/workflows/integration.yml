@@ -45,8 +45,8 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: integration tests
       run: |
-        # check minio is up
-        curl -H "Authorization: AWS administrator:administrator" http://localhost:9000
+        # check minio is up, should return unauthorised
+        curl http://localhost:9000
         pytest
       env:
         MINIO_TEST_CONNECTION: localhost:9000
