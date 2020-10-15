@@ -2,7 +2,7 @@ name: Integration tests and flake8
 
 on:
   push:
-    branches: [ master, fix-integration-tests-connect-minio ]
+    branches: [ master ]
   pull_request:
     branches: [ master ]
 
@@ -17,12 +17,14 @@ jobs:
       minio:
         # Not using official minio image minio/minio because it requires arguments (start /data) 
         # and github actions currently not supporting docker araguments
+        # bitnami/minio image has 1M+ pulls and is up to date
         image: bitnami/minio
         env:
           MINIO_ACCESS_KEY: administrator
           MINIO_SECRET_KEY: administrator
         ports:
           - 9000:9000
+        options: --name minio-server
 
     steps:
     - uses: actions/checkout@v2
@@ -42,7 +44,10 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: integration tests
-      run: pytest
+      run: |
+        # check minio is up
+        curl -H "Authorization: AWS administrator:administrator" http://minio:9000
+        pytest
       env:
         MINIO_TEST_CONNECTION: minio:9000
         MINIO_TEST_ACCESS_KEY: administrator
