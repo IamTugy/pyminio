@@ -15,13 +15,14 @@ jobs:
     
     services:
       minio:
-        image: minio/minio
+        # Not using official minio image minio/minio because it requires arguments (start /data) 
+        # and github actions currently not supporting docker araguments
+        image: bitnami/minio
         env:
           MINIO_ACCESS_KEY: administrator
           MINIO_SECRET_KEY: administrator
         ports:
           - 9000:9000
-        options: server /data
 
     steps:
     - uses: actions/checkout@v2
