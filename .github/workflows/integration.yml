@@ -46,9 +46,9 @@ jobs:
     - name: integration tests
       run: |
         # check minio is up
-        curl -H "Authorization: AWS administrator:administrator" http://minio:9000
+        curl -H "Authorization: AWS administrator:administrator" http://localhost:9000
         pytest
       env:
-        MINIO_TEST_CONNECTION: minio:9000
+        MINIO_TEST_CONNECTION: localhost:9000
         MINIO_TEST_ACCESS_KEY: administrator
         MINIO_TEST_SECRET_KEY: administrator
