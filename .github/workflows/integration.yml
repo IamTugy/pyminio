@@ -22,7 +22,6 @@ jobs:
         env:
           MINIO_ACCESS_KEY: administrator
           MINIO_SECRET_KEY: administrator
-        options: --name minio-server
 
     steps:
     - uses: actions/checkout@v2
@@ -44,6 +43,6 @@ jobs:
     - name: integration tests
       run: pytest
       env:
-        MINIO_TEST_CONNECTION: minio-server:9000
+        MINIO_TEST_CONNECTION: minio:9000
         MINIO_TEST_ACCESS_KEY: administrator
         MINIO_TEST_SECRET_KEY: administrator
