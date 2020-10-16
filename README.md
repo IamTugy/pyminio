@@ -25,7 +25,8 @@ or
 ```bash
 git clone https://github.com/mmm1513/pyminio.git
 cd pyminio
-python setup.py install
+python setup.py install  # also `pip install ."
+# `pip install -e '.[dev]'` for development
 ```
 
 ## Setting up Pyminio

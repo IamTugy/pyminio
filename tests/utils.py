@@ -15,6 +15,10 @@ class PyminioTest(Pyminio):
     SECRET_KEY = environ.get('MINIO_TEST_SECRET_KEY')
 
     def __init__(self):
+        if not all(v is not None for v in (self.ENDPOINT, self.ACCESS_KEY, self.SECRET_KEY)):
+            raise ValueError("Must define 'MINIO_TEST_CONNECTION', 'MINIO_TEST_ACCESS_KEY', "
+                             "'MINIO_TEST_SECRET_KEY' to run tests")
+
         super().__init__(minio_obj=Minio(
             endpoint=self.ENDPOINT,
             access_key=self.ACCESS_KEY,

@@ -20,6 +20,12 @@ setuptools.setup(
         'attrdict',
         'dataclasses'
     ],
+    extras_require={
+        'dev': [
+            'pytest',
+            'flake8',
+        ]
+    },
     classifiers=[
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
