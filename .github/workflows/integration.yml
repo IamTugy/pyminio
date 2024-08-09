@@ -18,8 +18,6 @@ jobs:
         image: minio/minio
         volumes:
           - /data
-        ports:
-          - 9000:9000
         env:
           MINIO_ACCESS_KEY: administrator
           MINIO_SECRET_KEY: administrator
