@@ -8,8 +8,8 @@ from os.path import join, basename, dirname, normpath
 
 import pytz
 from attrdict import AttrDict
-from minio import Minio, definitions
-from minio.error import NoSuchKey, BucketNotEmpty
+from minio import Minio, datatypes
+from minio.error import S3Error
 
 from .exceptions import DirectoryNotEmptyError
 from .structures import Match, ObjectData, File, Folder, ROOT
@@ -89,7 +89,7 @@ class Pyminio:
                                   object_name=match.prefix,
                                   data=empty_file, length=0)
 
-    def _get_objects_at(self, match: Match) -> List[definitions.Object]:
+    def _get_objects_at(self, match: Match) -> List[datatypes.Object]:
         """Return all objects in the specified bucket and directory path.
 
         Args:
@@ -236,9 +236,11 @@ class Pyminio:
             try:
                 self.minio_obj.remove_bucket(match.bucket)
 
-            except BucketNotEmpty:
-                raise DirectoryNotEmptyError("can not recursively delete "
-                                             "non-empty directory")
+            except S3Error as e:
+                if e.code in ["BucketNotEmpty"]:
+                    raise DirectoryNotEmptyError("can not recursively delete "
+                                                 "non-empty directory")
+                raise
         else:
             self.minio_obj.remove_object(match.bucket, match.prefix)
 
@@ -406,9 +408,10 @@ class Pyminio:
                 name = join(basename(normpath(details.object_name)), '')
                 return_obj = Folder
 
-        except (NoSuchKey, StopIteration):
-            raise ValueError(f"cannot access {path!r}: "
-                             "No such file or directory")
+        except S3Error as e:
+            if e.code in ["NoSuchKey", "StopIteration"]:
+                raise ValueError(f"cannot access {path!r}: "
+                                 "No such file or directory")
 
         details_metadata = \
             self._extract_metadata(details.metadata)
