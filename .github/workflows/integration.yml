@@ -15,15 +15,18 @@ jobs:
     
     services:
       minio:
-        # Not using official minio image minio/minio because it requires arguments (start /data) 
-        # and github actions currently not supporting docker araguments
-        # bitnami/minio image has 1M+ pulls and is up to date so it's should be OK to use it
-        image: bitnami/minio
+        image: minio/minio
+        volumes:
+          - /data
+        ports:
+          - 9000:9000
         env:
           MINIO_ACCESS_KEY: administrator
           MINIO_SECRET_KEY: administrator
         ports:
           - 9000:9000
+        volumes:
+          - /minio/data:/data
         options: --name minio-server
 
     steps:
