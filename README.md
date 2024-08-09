@@ -10,10 +10,10 @@ Pyminio is a wrapper to minio, that is more indecative for the user.
 It works like `os` module, so you don't need to understand minio's concepts, and just using regular paths.
 
 ## Content
-1. [Installation](#Installation)
-2. [Setting up Pyminio](#Setting-up-Pyminio)
-3. [Usage](#Usage)
-4. [Contribute](#Contribute)
+1. [Installation](#installation)
+2. [Setting up Pyminio](#setting-up-pyminio)
+3. [Usage](#usage)
+4. [Contribute](#contribute)
 
 ## Installation
 Use the package manager [pip](https://pypi.org/project/pyminio/) to install pyminio.
@@ -25,8 +25,8 @@ or
 ```bash
 git clone https://github.com/mmm1513/pyminio.git
 cd pyminio
-python setup.py install  # also `pip install ."
-# `pip install -e '.[dev]'` for development
+# python setup.py install  # also `pip install ."
+# # `pip install -e '.[dev]'` for development
 ```
 
 ## Setting up Pyminio
@@ -62,19 +62,19 @@ Firstly you need to set up your  [Minio Docker](https://hub.docker.com/r/minio/m
     ```
 
 ## Usage
-- [mkdirs](#mkdirs)
-- [listdir](#listdir)
-- [exists](#exists)
-- [isdir](#isdir)
-- [truncate](#truncate)
-- [rmdir](#rmdir)
-- [rm](#rm)
-- [cp](#cp)
-- [mv](#mv)
-- [get](#get)
-- [get_last_object](#get_last_object)
-- [put_data](#put_data)
-- [put_file](#put_file)
+- [mkdirs](#mkdirsself-path-str)
+- [listdir](#listdirself-path-str-files_only-bool--false-dirs_only-bool--false---tuplestr)
+- [exists](#existsself-path-str---bool)
+- [isdir](#isdirself-path-str)
+- [truncate](#truncateself---pyminio)
+- [rmdir](#rmdirself-path-str-recursive-bool--false---pyminio)
+- [rm](#rmself-path-str-recursive-bool--false---pyminio)
+- [cp](#cpself-from_path-str-to_path-str-recursive-bool--false---pyminio)
+- [mv](#mvself-from_path-str-to_path-str-recursive-bool--false---pyminio)
+- [get](#getself-path-str---objectdata)
+- [get_last_object](#get_last_objectself-path-str---file)
+- [put_data](#put_dataself-path-str-data-bytes-metadata-dict--none)
+- [put_file](#put_fileself-file_path-str-to_path-str-metadata-dict--none)
 
 ### <a name="mkdirs"></a>mkdirs(self, path: str)
 `Pyminio.mkdirs` will create the given full path if not exists like linux's `mkdir -p`.
@@ -161,7 +161,7 @@ DirectoryNotEmptyError: can not recursively delete non-empty directory
 ```
 
 ### <a name="rm"></a>rm(self, path: str, recursive: bool = False) -> Pyminio
-`Pyminio.rm` works like [rmdir](#rmdir) only that it can delete files too. Works like linux's `rm (-r)`.
+`Pyminio.rm` works like [rmdir](#rmdirself-path-str-recursive-bool--false---pyminio) only that it can delete files too. Works like linux's `rm (-r)`.
 
 ```python
 >>> pyminio_client.rm('/foo/bar/baz/file_name')
@@ -191,7 +191,7 @@ ValueError: can not activate this method from directory to a file.
 ```
 
 ### <a name="mv"></a>mv(self, from_path: str, to_path: str, recursive: bool = False) -> Pyminio
-`Pyminio.mv` works like [cp](#cp) only that it removes the source after the transfer has been completed. Works like linux's `mv`.
+`Pyminio.mv` works like [cp](#cpself-from_path-str-to_path-str-recursive-bool--false---pyminio) only that it removes the source after the transfer has been completed. Works like linux's `mv`.
 
 This method can only move recursively when the recursive flag is True. If not, it will raise a ValueError.
 
@@ -208,12 +208,12 @@ This objects will contain metadata, their path and name.
 >>> pyminio_client.get('/foo/bar/baz')
 File(name='baz', 
      full_path='/foo/bar/baz', 
-     metadata=AttrDict({
+     metadata={
          'is_dir': False, 
          'last_modified': time.struct_time(...), 
          'size': ..., 
          'content-type': ...
-     }), 
+     }, 
      data=...)
 ```
 
@@ -226,12 +226,12 @@ This method must get a directory path or it will raise a ValueError.
 >>> pyminio_client.get_last_object('/foo/bar/')
 File(name='baz', 
      full_path='/foo/bar/baz', 
-     metadata=AttrDict({
+     metadata={
          'is_dir': False, 
          'last_modified': time.struct_time(...), 
          'size': ..., 
          'content-type': ...
-     }), 
+     }, 
      data=...)
 ```
 
@@ -245,7 +245,7 @@ File(name='baz',
 ```
 
 ### <a name="put_file"></a>put_file(self, file_path: str, to_path: str, metadata: Dict = None)
-`Pyminio.put_file` works like [put_data](#put_data) only that instead of data it gets a path to a file in you computer. Then it will copy this file to the given location.
+`Pyminio.put_file` works like [put_data](#put_dataself-path-str-data-bytes-metadata-dict--none) only that instead of data it gets a path to a file in you computer. Then it will copy this file to the given location.
 
 ```python
 >>> metadata = {'Pyminio-is': 'Awesome'}
@@ -263,11 +263,18 @@ All contributions are welcome:
 
 ### Work environment
 
-After forking the project and installing the dependencies, (like specified in the [installations](#Installation) in part 2)
+After forking the project and installing the dependencies, (like specified in the [installations](#installation) in part 2)
 download the [minio docker](https://hub.docker.com/r/minio/minio/) and start an instance in your computer for development and testing.
+
+Export The same environment variables you've used to set up your local minio:
+```bash
+export MINIO_TEST_CONNECTION="<your API host>" # example: 127.0.0.1:9000
+export MINIO_TEST_ACCESS_KEY="<your user>" # example: ROOTNAME
+export MINIO_TEST_SECRET_KEY="<your password>" # example: CHANGEME123
+```
 
 to run the tests run:
 ```bash
-pytest
+poetry run pytest tests
 ```
 #### Don't forget to write tests, and to run all the tests before making a pull request.
