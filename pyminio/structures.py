@@ -1,10 +1,8 @@
 import re
-from os.path import join
-from typing import Dict, Any
 from dataclasses import dataclass
-
-from attrdict import AttrDict
-from cached_property import cached_property
+from functools import cached_property
+from os.path import join
+from typing import Any, Dict
 
 ROOT = "/"
 
@@ -26,9 +24,17 @@ class Folder(ObjectData):
     pass
 
 
+@dataclass
+class PathMatch:
+    bucket: str
+    prefix: str
+    filename: str
+
+
 class Match:
-    PATH_STRUCTURE = \
-        re.compile(r"/(?P<bucket>.*?)/+(?P<prefix>.*/+)?(?P<filename>.+[^/])?")
+    PATH_STRUCTURE = re.compile(
+        r"/(?P<bucket>.*?)/+(?P<prefix>.*/+)?(?P<filename>.+[^/])?"
+    )
 
     def __init__(self, path: str):
         self._path = path
@@ -36,7 +42,7 @@ class Match:
 
     @cached_property
     def path(self):
-        return re.sub(r'/+', r'/', self._path)
+        return re.sub(r"/+", r"/", self._path)
 
     @property
     def bucket(self):
@@ -50,20 +56,20 @@ class Match:
     def filename(self):
         return self._match.filename
 
-    def _get_match(self) -> AttrDict:
+    def _get_match(self) -> PathMatch:
         """Get the bucket name, path prefix and file's name from path."""
         if self.is_root():
-            return AttrDict(bucket='', prefix='', filename='')
+            return PathMatch(bucket="", prefix="", filename="")
 
         match = self.PATH_STRUCTURE.match(self.path)
 
         if match is None:
-            raise ValueError(f'{self.path} is not a valid path')
+            raise ValueError(f"{self.path} is not a valid path")
 
-        return AttrDict(
+        return PathMatch(
             bucket=match.group("bucket"),
-            prefix=match.group("prefix") or '',
-            filename=match.group("filename") or ''
+            prefix=match.group("prefix") or "",
+            filename=match.group("filename") or "",
         )
 
     def is_root(self):
@@ -74,16 +80,16 @@ class Match:
         return join(self.prefix, self.filename)
 
     def is_bucket(self):
-        return self.relative_path == ''
+        return self.bucket != "" and self.relative_path == ""
 
     def is_dir(self):
-        return self.filename == ''
+        return self.filename == ""
 
     def is_file(self):
         return not self.is_dir()
 
     @classmethod
-    def infer_operation_destination(cls, src: 'Match', dst: 'Match') -> 'Match':
+    def infer_operation_destination(cls, src: "Match", dst: "Match") -> "Match":
         """Return a match with the dst path and filename if exists.
         If not, return dst path with src filename.
 
@@ -102,10 +108,13 @@ class Match:
             ValueError: If src was not a valid file match.
         """
         if not src.is_file():
-            raise ValueError('Src must be a valid match to a file')
+            raise ValueError("Src must be a valid match to a file")
 
         if dst.is_file():
             return dst
 
         else:
             return Match(join(dst.path, src.filename))
+
+    def __repr__(self):
+        return f"Match('{self.path}')"

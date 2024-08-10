@@ -11,40 +11,46 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.7, 3.8]
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
     
     services:
       minio:
         # Not using official minio image minio/minio because it requires arguments (start /data) 
         # and github actions currently not supporting docker araguments
-        # bitnami/minio image has 1M+ pulls and is up to date so it's should be OK to use it
-        image: bitnami/minio
-        env:
-          MINIO_ACCESS_KEY: administrator
-          MINIO_SECRET_KEY: administrator
+        # bitnami/minio image has 10M+ pulls and is up to date so it's should be OK to use it
+        image: bitnami/minio:latest
         ports:
-          - 9000:9000
-        options: --name minio-server
+          - '9000:9000'
+          - '9001:9001'
+        env:
+          MINIO_ROOT_USER: administrator
+          MINIO_ROOT_PASSWORD: administrator
+        options: >-
+          --health-cmd "curl -I http://localhost:9000/minio/health/live"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 6
+          --health-start-period 30s
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 pytest
-        pip install .
+        pip install pylint poetry
+        poetry install --with dev
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        poetry run flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        poetry run flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: integration tests
-      run: pytest
+      run: poetry run pytest tests
       env:
         MINIO_TEST_CONNECTION: localhost:9000
         MINIO_TEST_ACCESS_KEY: administrator
