@@ -429,7 +429,7 @@ class Pyminio:
             path: path of a directory or a file.
         """
         match = Match(path)
-        return_obj: type[ObjectData]
+        return_obj: Type[ObjectData]
         kwargs = {}
 
         if match.is_bucket():
@@ -473,7 +473,7 @@ class Pyminio:
         }
         metadata.update(details_metadata)
 
-        return return_obj(name=name, full_path=path, metadata=metadata, **kwargs)
+        return return_obj(name=name, full_path=path, metadata=metadata, **kwargs)  # type: ignore[no-any-return, unused-ignore]
 
     def put_data(self, path: str, data: bytes, metadata: METADATA_TYPE = None) -> None:
         """Put data in file inside a minio folder.
