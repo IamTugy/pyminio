@@ -41,19 +41,19 @@ class Match:
         self._match = self._get_match()
 
     @cached_property
-    def path(self):
+    def path(self) -> str:
         return re.sub(r"/+", r"/", self._path)
 
     @property
-    def bucket(self):
+    def bucket(self) -> str:
         return self._match.bucket
 
     @property
-    def prefix(self):
+    def prefix(self) -> str:
         return self._match.prefix
 
     @property
-    def filename(self):
+    def filename(self) -> str:
         return self._match.filename
 
     def _get_match(self) -> PathMatch:
@@ -72,20 +72,20 @@ class Match:
             filename=match.group("filename") or "",
         )
 
-    def is_root(self):
+    def is_root(self) -> bool:
         return self.path == ROOT
 
     @property
-    def relative_path(self):
+    def relative_path(self) -> str:
         return join(self.prefix, self.filename)
 
-    def is_bucket(self):
+    def is_bucket(self) -> bool:
         return self.bucket != "" and self.relative_path == ""
 
-    def is_dir(self):
+    def is_dir(self) -> bool:
         return self.filename == ""
 
-    def is_file(self):
+    def is_file(self) -> bool:
         return not self.is_dir()
 
     @classmethod
@@ -116,5 +116,5 @@ class Match:
         else:
             return Match(join(dst.path, src.filename))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Match('{self.path}')"

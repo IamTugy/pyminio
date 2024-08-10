@@ -4,7 +4,7 @@ from functools import wraps
 from io import BytesIO
 from os.path import basename, join, normpath
 from posixpath import dirname
-from typing import Any, Dict, Iterable, List, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, TypeVar, Union
 
 from minio import Minio, datatypes
 from minio.commonconfig import CopySource
@@ -16,12 +16,16 @@ from .structures import ROOT, File, Folder, Match, ObjectData
 
 METADATA_TYPE = Union[Dict[str, Union[str, List[str], Tuple[str]]], None]
 
+RetType = TypeVar("RetType")
 
-def _validate_directory(func):
+
+def _validate_directory(func: Callable[..., RetType]) -> Callable[..., RetType]:
     """Check if directory path is valid."""
 
     @wraps(func)
-    def decorated_method(self, path: str, *args, **kwargs):
+    def decorated_method(
+        self: "Pyminio", path: str, *args: Any, **kwargs: Any
+    ) -> RetType:
         match = Match(path)
         if match.is_file():
             raise ValueError(
@@ -34,19 +38,18 @@ def _validate_directory(func):
     return decorated_method
 
 
-def get_last_modified(obj):
+def get_last_modified(obj: datatypes.Object) -> datetime:
     """Return object's last modified time."""
     if obj.last_modified is None:
         return datetime.fromtimestamp(0, tz=timezone.utc)
+    return obj.last_modified  # type: ignore [no-any-return]
 
-    return obj.last_modified
 
-
-def get_creation_date(obj):
+def get_creation_date(obj: datatypes.Bucket) -> datetime:
     """Return object's creation date."""
     if obj.creation_date is None:
         return datetime.fromtimestamp(0, tz=timezone.utc)
-    return obj.creation_date
+    return obj.creation_date  # type: ignore [no-any-return]
 
 
 class Pyminio:
@@ -57,7 +60,11 @@ class Pyminio:
 
     @classmethod
     def from_credentials(
-        cls, endpoint: str, access_key: str, secret_key: str, **kwargs
+        cls: Type["Pyminio"],
+        endpoint: str,
+        access_key: str,
+        secret_key: str,
+        **kwargs: Any,
     ) -> "Pyminio":
         return cls(
             minio_obj=Minio(
@@ -69,7 +76,7 @@ class Pyminio:
         )
 
     @_validate_directory
-    def mkdirs(self, path: str):
+    def mkdirs(self, path: str) -> None:
         """Create path of directories.
 
         Works like linux's: 'mkdir -p'.
@@ -128,7 +135,7 @@ class Pyminio:
             reverse=True,
         )
 
-    def _get_buckets(self):
+    def _get_buckets(self) -> List[datatypes.Bucket]:
         """Return all existed buckets."""
         return sorted(
             self.minio_obj.list_buckets(), key=get_creation_date, reverse=True
@@ -151,7 +158,7 @@ class Pyminio:
     @_validate_directory
     def listdir(
         self, path: str, files_only: bool = False, dirs_only: bool = False
-    ) -> tuple:
+    ) -> Tuple[str, ...]:
         """Return all files and directories within the directory path.
 
         Works like os.listdir.
@@ -206,7 +213,7 @@ class Pyminio:
 
         return True
 
-    def isdir(self, path: str):
+    def isdir(self, path: str) -> bool:
         """Check if the specified path is a directory.
 
         Works like os.path.isdir
@@ -295,7 +302,7 @@ class Pyminio:
         self.minio_obj.remove_object(match.bucket, match.relative_path)
         return self
 
-    def _get_destination(self, from_path: str, to_path: str):
+    def _get_destination(self, from_path: str, to_path: str) -> Match:
         from_match = Match(from_path)
         to_match = Match(to_path)
 
@@ -422,7 +429,7 @@ class Pyminio:
             path: path of a directory or a file.
         """
         match = Match(path)
-        return_obj: type[ObjectData]
+        return_obj: Type[ObjectData]
         kwargs = {}
 
         if match.is_bucket():
@@ -466,9 +473,9 @@ class Pyminio:
         }
         metadata.update(details_metadata)
 
-        return return_obj(name=name, full_path=path, metadata=metadata, **kwargs)
+        return return_obj(name=name, full_path=path, metadata=metadata, **kwargs)  # type: ignore[no-any-return, unused-ignore]
 
-    def put_data(self, path: str, data: bytes, metadata: METADATA_TYPE = None):
+    def put_data(self, path: str, data: bytes, metadata: METADATA_TYPE = None) -> None:
         """Put data in file inside a minio folder.
 
         Args:
