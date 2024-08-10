@@ -1,25 +1,27 @@
 [tool.poetry]
 name = "pyminio"
-version = "0.3.0"
+version = "0.3.1"
 description = "Python client for Minio"
 authors = ["Michael Tugendhaft <tugmica@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.8.1"
 minio = ">=7.2.7"
-pytz = "^2024.1"
 
 
 [tool.poetry.group.dev.dependencies]
 isort = "^5.13.2"
 black = "^24.8.0"
-flake8 = "^7.1.1"
+flake8 = "^7.1.0"
 pytest = "^8.3.2"
 mypy = "^1.11.1"
-types-pytz = "^2024.1.0.20240417"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+atomic = true

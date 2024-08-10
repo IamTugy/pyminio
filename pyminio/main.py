@@ -1,18 +1,20 @@
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
 from io import BytesIO
 from os.path import basename, join, normpath
 from posixpath import dirname
-from typing import Iterable
+from typing import Any, Iterable, Union
 
-import pytz
 from minio import Minio, datatypes
 from minio.commonconfig import CopySource
 from minio.error import S3Error
+from urllib3 import HTTPHeaderDict
 
 from .exceptions import DirectoryNotEmptyError
 from .structures import ROOT, File, Folder, Match, ObjectData
+
+METADATA_TYPE = Union[dict[str, Union[str, list[str], tuple[str]]], None]
 
 
 def _validate_directory(func):
@@ -35,7 +37,7 @@ def _validate_directory(func):
 def get_last_modified(obj):
     """Return object's last modified time."""
     if obj.last_modified is None:
-        return pytz.UTC.localize(datetime.fromtimestamp(0))
+        return datetime.fromtimestamp(0, tz=timezone.utc)
 
     return obj.last_modified
 
@@ -43,7 +45,7 @@ def get_last_modified(obj):
 def get_creation_date(obj):
     """Return object's creation date."""
     if obj.creation_date is None:
-        return pytz.UTC.localize(datetime.fromtimestamp(0))
+        return datetime.fromtimestamp(0, tz=timezone.utc)
     return obj.creation_date
 
 
@@ -133,7 +135,9 @@ class Pyminio:
         )
 
     @classmethod
-    def _extract_metadata(cls, detailed_metadata: dict) -> dict[str, str]:
+    def _extract_metadata(
+        cls, detailed_metadata: Union[HTTPHeaderDict, dict[str, str], None]
+    ) -> dict[str, Any]:
         """Remove 'X-Amz-Meta-' from all the keys, and lowercase them.
         When metadata is pushed in the minio, the minio is adding
         those details that screw us. this is an unscrewing function.
@@ -147,7 +151,7 @@ class Pyminio:
     @_validate_directory
     def listdir(
         self, path: str, files_only: bool = False, dirs_only: bool = False
-    ) -> tuple[str]:
+    ) -> tuple:
         """Return all files and directories within the directory path.
 
         Works like os.listdir.
@@ -169,7 +173,7 @@ class Pyminio:
             return tuple(f"{b.name}/" for b in self._get_buckets())
 
         return tuple(
-            obj.object_name.replace(match.prefix, "")
+            (obj.object_name or "").replace(match.prefix, "")
             for obj in self._get_objects_at(match)
             if not (files_only and obj.is_dir or dirs_only and not obj.is_dir)
         )
@@ -215,7 +219,7 @@ class Pyminio:
             self.rmdir(join(ROOT, bucket), recursive=True)
         return self
 
-    def _remove_root(self, recursive: bool) -> None:
+    def _remove_root(self, recursive: bool) -> "Pyminio":
         if recursive:
             return self.truncate()
         raise DirectoryNotEmptyError(
@@ -224,7 +228,7 @@ class Pyminio:
 
     def _remove_content(self, objects: list[datatypes.Object]) -> None:
         for obj in objects:
-            self.minio_obj.remove_object(obj.bucket_name, obj.object_name)
+            self.minio_obj.remove_object(obj.bucket_name, obj.object_name or "")
 
     def _remove_bucket(self, bucket: str) -> None:
         try:
@@ -354,7 +358,7 @@ class Pyminio:
             dirs_to_copy.extend(dirs)
 
         for obj_to_copy in files_to_copy:
-            self.cp(**obj_to_copy)
+            self.cp(from_path=obj_to_copy["from_path"], to_path=obj_to_copy["to_path"])
 
         return self
 
@@ -418,6 +422,7 @@ class Pyminio:
             path: path of a directory or a file.
         """
         match = Match(path)
+        return_obj: type[ObjectData]
         kwargs = {}
 
         if match.is_bucket():
@@ -441,7 +446,7 @@ class Pyminio:
                 details = next(
                     obj for obj in objects if obj.object_name == match.relative_path
                 )
-                name = join(basename(normpath(details.object_name)), "")
+                name = join(basename(normpath(details.object_name or "")), "")
                 return_obj = Folder
 
         except StopIteration:
@@ -463,7 +468,7 @@ class Pyminio:
 
         return return_obj(name=name, full_path=path, metadata=metadata, **kwargs)
 
-    def put_data(self, path: str, data: bytes, metadata: dict = None):
+    def put_data(self, path: str, data: bytes, metadata: METADATA_TYPE = None):
         """Put data in file inside a minio folder.
 
         Args:
@@ -483,7 +488,9 @@ class Pyminio:
         )
         data_file.close()
 
-    def put_file(self, file_path: str, to_path: str, metadata: dict = None):
+    def put_file(
+        self, file_path: str, to_path: str, metadata: METADATA_TYPE = None
+    ) -> None:
         """Put file inside a minio folder.
 
         If file_path will be a path to a file, the name will be
@@ -505,7 +512,7 @@ class Pyminio:
         )
 
     @_validate_directory
-    def get_last_object(self, path: str) -> File:
+    def get_last_object(self, path: str) -> Union[ObjectData, None]:
         """Return the last modified object.
 
         Args:
