@@ -6,10 +6,6 @@ on:
   pull_request:
     branches: [ main ]
 
-networks:
-  app-tier:
-    driver: bridge
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,8 +25,6 @@ jobs:
         environment:
           - MINIO_ROOT_USER=administrator
           - MINIO_ROOT_PASSWORD=administrator
-        networks:
-          - app-tier
 
     steps:
     - uses: actions/checkout@v3
