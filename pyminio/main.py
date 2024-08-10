@@ -4,7 +4,7 @@ from functools import wraps
 from io import BytesIO
 from os.path import basename, join, normpath
 from posixpath import dirname
-from typing import Any, Iterable, Union
+from typing import Any, Dict, Iterable, List, Tuple, Union
 
 from minio import Minio, datatypes
 from minio.commonconfig import CopySource
@@ -14,7 +14,7 @@ from urllib3 import HTTPHeaderDict
 from .exceptions import DirectoryNotEmptyError
 from .structures import ROOT, File, Folder, Match, ObjectData
 
-METADATA_TYPE = Union[dict[str, Union[str, list[str], tuple[str]]], None]
+METADATA_TYPE = Union[Dict[str, Union[str, List[str], Tuple[str]]], None]
 
 
 def _validate_directory(func):
@@ -102,7 +102,7 @@ class Pyminio:
     @staticmethod
     def _remove_current_from_object_list(
         objects: Iterable[datatypes.Object], match: Match
-    ) -> list[datatypes.Object]:
+    ) -> List[datatypes.Object]:
         """When finding results list_objects return the given path aswell."""
         return [
             obj
@@ -110,7 +110,7 @@ class Pyminio:
             if match.path != f"/{obj.bucket_name}/{obj.object_name}"
         ]
 
-    def _get_objects_at(self, match: Match) -> list[datatypes.Object]:
+    def _get_objects_at(self, match: Match) -> List[datatypes.Object]:
         """Return all objects in the specified bucket and directory path.
 
         Args:
@@ -136,8 +136,8 @@ class Pyminio:
 
     @classmethod
     def _extract_metadata(
-        cls, detailed_metadata: Union[HTTPHeaderDict, dict[str, str], None]
-    ) -> dict[str, Any]:
+        cls, detailed_metadata: Union[HTTPHeaderDict, Dict[str, str], None]
+    ) -> Dict[str, Any]:
         """Remove 'X-Amz-Meta-' from all the keys, and lowercase them.
         When metadata is pushed in the minio, the minio is adding
         those details that screw us. this is an unscrewing function.
@@ -226,7 +226,7 @@ class Pyminio:
             "can not recursively delete non-empty root directory, use the recursive flag."
         )
 
-    def _remove_content(self, objects: list[datatypes.Object]) -> None:
+    def _remove_content(self, objects: List[datatypes.Object]) -> None:
         for obj in objects:
             self.minio_obj.remove_object(obj.bucket_name, obj.object_name or "")
 

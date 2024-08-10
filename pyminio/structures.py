@@ -2,7 +2,7 @@ import re
 from dataclasses import dataclass
 from functools import cached_property
 from os.path import join
-from typing import Any
+from typing import Any, Dict
 
 ROOT = "/"
 
@@ -11,7 +11,7 @@ ROOT = "/"
 class ObjectData:
     name: str
     full_path: str
-    metadata: dict[str, Any]
+    metadata: Dict[str, Any]
 
 
 @dataclass
