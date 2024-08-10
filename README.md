@@ -256,7 +256,18 @@ All contributions are welcome:
 
 ### Work environment
 
-After forking the project and installing the dependencies, (like specified in the [installations](#installation) in part 2)
+After forking the project, make sure you have poetry installed, 
+than install the dependencies using
+```bash
+poetry install
+```
+
+Also install pre-commit and activate it:
+```bash
+pip install pre-commit
+pre-commit install
+```
+
 download the [minio docker](https://hub.docker.com/r/minio/minio/) and start an instance in your computer for development and testing.
 
 Export The same environment variables you've used to set up your local minio:

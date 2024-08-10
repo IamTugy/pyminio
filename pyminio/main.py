@@ -4,7 +4,7 @@ from functools import wraps
 from io import BytesIO
 from os.path import basename, join, normpath
 from posixpath import dirname
-from typing import Any, Callable, Dict, Iterable, List, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, TypeVar, Union
 
 from minio import Minio, datatypes
 from minio.commonconfig import CopySource
@@ -60,7 +60,7 @@ class Pyminio:
 
     @classmethod
     def from_credentials(
-        cls: type["Pyminio"],
+        cls: Type["Pyminio"],
         endpoint: str,
         access_key: str,
         secret_key: str,
