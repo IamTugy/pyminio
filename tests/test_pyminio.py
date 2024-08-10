@@ -1,17 +1,21 @@
 from functools import wraps
 from os.path import join
+from typing import Callable, Dict, Generator, List, Union
 
 import pytest
 
 from pyminio.exceptions import DirectoryNotEmptyError
+from pyminio.structures import File
 
 from .utils import PyminioTest
 
 ROOT = "/"
 FILE_CONTENT = b"test"
 
+FS_TYPE = Dict[str, Union[List["FS_TYPE"], "FS_TYPE", None]]
 
-def _mkdirs_recursively(client, fs, relative_path):
+
+def _mkdirs_recursively(client: PyminioTest, fs: FS_TYPE, relative_path: str) -> None:
     for key, value in fs.items():
         abspath = join(relative_path, key)
         if value is None:
@@ -21,14 +25,19 @@ def _mkdirs_recursively(client, fs, relative_path):
         elif value == []:
             client.mkdirs(join(abspath, ""))
 
+        elif isinstance(value, dict):
+            _mkdirs_recursively(client=client, fs=value, relative_path=abspath)
+
         else:
-            _mkdirs_recursively(client=client, fs=fs[key], relative_path=abspath)
+            raise ValueError("Invalid FS structure")
 
 
-def mock_fs(fs, relative_path=ROOT):
-    def decorator(func):
+def mock_fs(
+    fs: FS_TYPE, relative_path: str = ROOT
+) -> Callable[[Callable[[PyminioTest], None]], Callable[[PyminioTest], None]]:
+    def decorator(func: Callable[[PyminioTest], None]) -> Callable[[PyminioTest], None]:
         @wraps(func)
-        def wrapper(client):
+        def wrapper(client: PyminioTest) -> None:
             _mkdirs_recursively(client=client, fs=fs, relative_path=relative_path)
             return func(client)
 
@@ -37,17 +46,17 @@ def mock_fs(fs, relative_path=ROOT):
     return decorator
 
 
-@pytest.fixture
-def client():
+@pytest.fixture  # type: ignore [misc]
+def client() -> Generator[PyminioTest, None, None]:
     client = PyminioTest()
     yield client
     client.rm("/", recursive=True)
 
 
-def test_basic_fixtures():
+def test_basic_fixtures() -> None:
     """Test the basic fixture that is used in all tests."""
     _client = PyminioTest()
-    file_system = {
+    file_system: FS_TYPE = {
         "foo1": {
             "bar": [],
         },
@@ -64,13 +73,13 @@ def test_basic_fixtures():
             }
         },
     }
-    mock_fs(file_system)(_client)
+    mock_fs(file_system)(lambda _: None)(_client)
     _client.rm("/", recursive=True)
     assert _client.listdir("/") == tuple()
 
 
 @mock_fs({"foo": {"bar1": {"baz": None}, "bar2": []}})
-def test_exists(client):
+def test_exists(client: PyminioTest) -> None:
     assert client.exists("/foo/")
     assert not client.exists("/foo")
     assert client.exists("/foo//")
@@ -100,7 +109,7 @@ def test_exists(client):
         },
     }
 )
-def test_listdir(client):
+def test_listdir(client: PyminioTest) -> None:
     assert set(client.listdir("/")) == {"foo1/", "foo2/", "foo3/"}
     assert set(client.listdir("/foo1/")) == {"bar/"}
     assert set(client.listdir("/foo2/")) == {"bar/"}
@@ -128,7 +137,7 @@ def test_listdir(client):
         },
     }
 )
-def test_listdir_files_only(client):
+def test_listdir_files_only(client: PyminioTest) -> None:
     assert set(client.listdir("/", files_only=True)) == set()
     assert set(client.listdir("/foo1/", files_only=True)) == set()
     assert set(client.listdir("/foo2/", files_only=True)) == set()
@@ -155,7 +164,7 @@ def test_listdir_files_only(client):
         },
     }
 )
-def test_listdir_dirs_only(client):
+def test_listdir_dirs_only(client: PyminioTest) -> None:
     assert set(client.listdir("/")) == {"foo1/", "foo2/", "foo3/"}
     assert set(client.listdir("/foo1/", dirs_only=True)) == {"bar/"}
     assert set(client.listdir("/foo2/", dirs_only=True)) == {"bar/"}
@@ -164,7 +173,7 @@ def test_listdir_dirs_only(client):
 
 
 @mock_fs({"foo": {"bar": {"baz": None}}})
-def test_isdir(client):
+def test_isdir(client: PyminioTest) -> None:
     assert client.isdir("/foo/")
     assert client.isdir("/foo/bar/")
     assert not client.isdir("/foo/bar/baz")
@@ -189,7 +198,7 @@ def test_isdir(client):
         },
     }
 )
-def test_rmdir(client):
+def test_rmdir(client: PyminioTest) -> None:
     client.rmdir("/foo1/bar/")
     assert not client.exists("/foo1/bar/")
 
@@ -229,7 +238,7 @@ def test_rmdir(client):
         },
     }
 )
-def test_rm(client):
+def test_rm(client: PyminioTest) -> None:
     client.rm("/foo1/bar/")
     assert not client.exists("/foo1/bar/")
 
@@ -251,8 +260,9 @@ def test_rm(client):
 
 
 @mock_fs({"foo": {"bar": None}})
-def test_get_data(client):
+def test_get_data(client: PyminioTest) -> None:
     file_obj = client.get("/foo/bar")
+    assert isinstance(file_obj, File)
     assert file_obj.name == "bar"
     assert file_obj.full_path == "/foo/bar"
     assert file_obj.data == FILE_CONTENT
@@ -268,7 +278,7 @@ def test_get_data(client):
         }
     }
 )
-def test_get_folder(client):
+def test_get_folder(client: PyminioTest) -> None:
     folder_obj1 = client.get("/foo/bar1/")
     assert folder_obj1.name == "bar1/"
     assert folder_obj1.metadata["is_dir"]
@@ -287,7 +297,7 @@ def test_get_folder(client):
         }
     }
 )
-def test_cp(client):
+def test_cp(client: PyminioTest) -> None:
     client.cp("/foo/baz", "/foo/bar2/")
     assert client.exists("/foo/bar2/baz")
 
@@ -304,7 +314,7 @@ def test_cp(client):
         }
     }
 )
-def test_mv(client):
+def test_mv(client: PyminioTest) -> None:
     client.mv("/foo/baz", "/foo/bar2/")
     assert client.exists("/foo/bar2/baz")
     assert not client.exists("/foo/baz")
@@ -329,7 +339,7 @@ def test_mv(client):
         "foo3": [],
     }
 )
-def test_recursive_mv_buckets(client):
+def test_recursive_mv_buckets(client: PyminioTest) -> None:
     client.mv("/foo1/", "/foo2/", recursive=True)
     assert not client.exists("/foo1/")
     assert client.exists("/foo2/bar/baz1/")
@@ -352,7 +362,7 @@ def test_recursive_mv_buckets(client):
         "foo1": [],
     }
 )
-def test_mv_to_exists_bucket(client):
+def test_mv_to_exists_bucket(client: PyminioTest) -> None:
     client.mv("/foo/", "/foo1/", recursive=True)
     assert client.exists("/foo1/foo/bar1/")
     assert client.exists("/foo1/foo/bar2/")
@@ -370,8 +380,8 @@ def test_mv_to_exists_bucket(client):
         "baz": [],
     }
 )
-def test_get_last_object(client):
+def test_get_last_object(client: PyminioTest) -> None:
     client.put_data("/foo/bar4", FILE_CONTENT)
-    assert client.get_last_object("/foo/").name == "bar4"
-
+    obj = client.get_last_object("/foo/")
+    assert obj is not None and obj.name == "bar4"
     assert client.get_last_object("/baz/") is None

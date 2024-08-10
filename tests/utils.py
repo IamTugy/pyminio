@@ -11,14 +11,12 @@ class PyminioTest(Pyminio):
     """Create minio connection at your local minio,
     but all paths will be in bucket: test."""
 
-    ENDPOINT = environ.get("MINIO_TEST_CONNECTION")
-    ACCESS_KEY = environ.get("MINIO_TEST_ACCESS_KEY")
-    SECRET_KEY = environ.get("MINIO_TEST_SECRET_KEY")
+    ENDPOINT = environ["MINIO_TEST_CONNECTION"]
+    ACCESS_KEY = environ["MINIO_TEST_ACCESS_KEY"]
+    SECRET_KEY = environ["MINIO_TEST_SECRET_KEY"]
 
-    def __init__(self):
-        if not all(
-            v is not None for v in (self.ENDPOINT, self.ACCESS_KEY, self.SECRET_KEY)
-        ):
+    def __init__(self: "PyminioTest") -> None:
+        if None in (self.ENDPOINT, self.ACCESS_KEY, self.SECRET_KEY):
             raise ValueError(
                 "Must define 'MINIO_TEST_CONNECTION', 'MINIO_TEST_ACCESS_KEY', "
                 "'MINIO_TEST_SECRET_KEY' to run tests"
@@ -32,21 +30,3 @@ class PyminioTest(Pyminio):
                 secure=False,
             )
         )
-
-
-def test_with_pyminio(test_class):
-    class NewTestClass(test_class):
-        def __init__(self, *args, **kwargs):
-            super(NewTestClass, self).__init__(*args, **kwargs)
-            self._class.name_ = test_class.__name__
-            self.pyminio = PyminioTest()
-
-        def setUp(self):
-            super(NewTestClass, self).setUp()
-            self.pyminio.mkdirs(TEST_DIR)
-
-        def tearDown(self):
-            super(NewTestClass, self).tearDown()
-            self.pyminio.rmdir(TEST_DIR, recursive=True)
-
-    return NewTestClass
