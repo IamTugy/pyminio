@@ -21,13 +21,6 @@ Use the package manager [pip](https://pypi.org/project/pyminio/) to install pymi
 ```bash
 pip install pyminio
 ```
-or
-```bash
-git clone https://github.com/mmm1513/pyminio.git
-cd pyminio
-# python setup.py install  # also `pip install ."
-# # `pip install -e '.[dev]'` for development
-```
 
 ## Setting up Pyminio
 
@@ -256,7 +249,7 @@ File(name='baz',
 
 All contributions are welcome:
 
-- Read the [issues](https://github.com/mmm1513/pyminio/issues), Fork the [project](https://github.com/mmm1513/pyminio) and create a new Pull Request.
+- Read the [issues](https://github.com/IamTugy/pyminio/issues), Fork the [project](https://github.com/IamTugy/pyminio) and create a new Pull Request.
 - Request a new feature creating a `New issue` with the `enhancement` tag.
 - Find any kind of errors in the code and create a `New issue` with the details, or fork the project and do a Pull Request.
 - Suggest a better or more pythonic way for existing examples.
