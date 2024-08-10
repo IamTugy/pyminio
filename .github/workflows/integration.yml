@@ -22,9 +22,15 @@ jobs:
         ports:
           - '9000:9000'
           - '9001:9001'
-        environment:
-          - MINIO_ROOT_USER=administrator
-          - MINIO_ROOT_PASSWORD=administrator
+        env:
+          MINIO_ROOT_USER: administrator
+          MINIO_ROOT_PASSWORD: administrator
+        options: >-
+          --health-cmd "curl -I http://localhost:9000/minio/health/live"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 6
+          --health-start-period 30s
 
     steps:
     - uses: actions/checkout@v3
