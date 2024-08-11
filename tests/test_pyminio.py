@@ -1,5 +1,5 @@
 from functools import wraps
-from os.path import join
+from posixpath import join
 from typing import Callable, Dict, Generator, List, Union
 
 import pytest
