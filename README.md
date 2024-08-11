@@ -6,8 +6,10 @@
 
 I have developed pyminio while trying to work with the minio's original python client with a lot of struggles. I had to read and understand minio's implementations to preform the most simple tasks.
 
-Pyminio is a wrapper to minio, that is more indecative for the user.
+Pyminio is a wrapper to [minio](https://github.com/minio/minio-py), that is more indecative for the user.
 It works like `os` module, so you don't need to understand minio's concepts, and just using regular paths.
+
+The latest Pyminio supports minio >= 7.2
 
 ## Content
 1. [Installation](#installation)
