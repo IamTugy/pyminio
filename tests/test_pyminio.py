@@ -1,8 +1,12 @@
 from functools import wraps
+from os import makedirs, remove
+from os.path import exists as osexists
+from os.path import join as osjoin
 from posixpath import join
 from typing import Callable, Dict, Generator, List, Union
 
 import pytest
+import requests
 
 from pyminio.exceptions import DirectoryNotEmptyError
 from pyminio.structures import File
@@ -385,3 +389,132 @@ def test_get_last_object(client: PyminioTest) -> None:
     obj = client.get_last_object("/foo/")
     assert obj is not None and obj.name == "bar4"
     assert client.get_last_object("/baz/") is None
+
+
+@mock_fs(
+    {
+        "foo": {
+            "bar1": {
+                "baz1": [],
+                "baz2": None,
+            },
+            "bar2": [],
+            "bar3": None,
+            "bar4": None,
+        },
+        "baz": [],
+    }
+)
+def test_get_presigned_get_object_url(client: PyminioTest) -> None:
+    # Additional test setup
+    download_dir = "downloaded_tests"
+    download_path = osjoin(download_dir, "downloaded_file")
+    # Create download directory if it doesn't exist
+    makedirs(download_dir, exist_ok=True)
+    # Upload file content to MinIO
+    client.put_data("/foo/bar3", FILE_CONTENT)
+
+    # Generate presigned URL for GET request
+    presigned_url = client.get_presigned_get_object_url("/foo/bar3")
+    # Check that the presigned URL is not None
+    assert presigned_url is not None
+
+    # Make GET request to presigned URL and download the file
+    response = requests.get(presigned_url)
+    # Check that the GET request was successful
+    assert response.status_code == 200
+
+    # Write the downloaded content to a file
+    with open(download_path, "wb") as f:
+        f.write(response.content)
+    # Validate that the file was downloaded successfully
+    assert osexists(download_path)
+    # Validate the content of the downloaded file
+    with open(download_path, "rb") as f:
+        downloaded_content = f.read()
+    assert downloaded_content == FILE_CONTENT
+
+    # Clean up by removing the downloaded file
+    remove(download_path)
+
+
+@mock_fs(
+    {
+        "foo": {
+            "bar1": {
+                "baz1": [],
+                "baz2": None,
+            },
+            "bar2": [],
+            "bar3": None,
+            "bar4": None,
+        },
+        "baz": [],
+    }
+)
+def test_get_presigned_delete_object_url(client: PyminioTest) -> None:
+    # Upload file content to MinIO
+    client.put_data("/foo/bar3", FILE_CONTENT)
+
+    # Generate presigned URL for DELETE request
+    presigned_url = client.get_presigned_delete_object_url("/foo/bar3")
+    # Check that the presigned URL is not None
+    assert presigned_url is not None
+
+    # Make DELETE request to presigned URL
+    response = requests.delete(presigned_url)
+    # Check that the DELETE request was successful
+    # 204 No Content is typical for a successful DELETE
+    assert response.status_code == 204
+
+    # Validate that the object has been deleted by trying to get its presigned URL again
+    with pytest.raises(Exception):
+        client.get_presigned_get_object_url("/foo/bar3")
+
+
+@mock_fs(
+    {
+        "foo": {
+            "bar1": {
+                "baz1": [],
+                "baz2": None,
+            },
+            "bar2": [],
+            "bar3": None,
+            "bar4": None,
+        },
+        "baz": [],
+    }
+)
+def test_presigned_url_put_object(client: PyminioTest) -> None:
+    # Additional test setup
+    upload_file_name = "local_file.txt"
+    local_dir = "."
+    upload_path = osjoin(local_dir, upload_file_name)
+    upload_content = b"Sample content for PUT operation."
+    # Write content to a local file
+    with open(upload_path, "wb") as f:
+        f.write(upload_content)
+
+    # Generate presigned URL for PUT request
+    presigned_url = client.get_presigned_put_object_url("/foo/bar2/", upload_file_name)
+    # Check that the presigned URL is not None
+    assert presigned_url is not None
+
+    # Make PUT request to upload the file
+    with open(upload_path, "rb") as f:
+        response = requests.put(presigned_url, data=f)
+    # Check that the PUT request was successful
+    assert response.status_code == 200
+
+    # Validate that the object was uploaded by generating a GET URL and checking the content
+    presigned_get_url = client.get_presigned_get_object_url(
+        f"/foo/bar2/{upload_file_name}"
+    )
+    get_response = requests.get(presigned_get_url)
+    # Validate that the GET request was successful
+    assert get_response.status_code == 200
+    assert get_response.content == upload_content
+
+    # Clean up: remove the local file
+    remove(upload_path)
