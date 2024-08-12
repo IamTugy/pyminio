@@ -539,7 +539,7 @@ class Pyminio:
         return self.get(new_path)
 
     def get_presigned_get_object_url(
-        self, path: str, expires=timedelta(hours=PRESIGNED_EXPIRATION_TIME)
+        self, path: str, expires: timedelta = timedelta(hours=PRESIGNED_EXPIRATION_TIME)
     ) -> str:
         """Get presigned URL string to download the object in the given path with default expiry of two hours.
 
@@ -555,7 +555,7 @@ class Pyminio:
             if match.is_file():
                 details = self.minio_obj.stat_object(match.bucket, match.relative_path)
                 if not details.is_dir:
-                    url = self.minio_obj.presigned_get_object(
+                    url: str = self.minio_obj.presigned_get_object(
                         match.bucket, match.relative_path, expires=expires
                     )
                     return url
@@ -578,7 +578,7 @@ class Pyminio:
         self,
         to_path: str,
         file_name: str,
-        expires=timedelta(hours=PRESIGNED_EXPIRATION_TIME),
+        expires: timedelta = timedelta(hours=PRESIGNED_EXPIRATION_TIME),
     ) -> str:
         """Get presigned URL string to upload the object in the given path with default expiry of two hours.
 
@@ -591,7 +591,7 @@ class Pyminio:
 
         if match.is_dir():
             match = Match(join(to_path, basename(file_name)))
-            url = self.minio_obj.presigned_put_object(
+            url: str = self.minio_obj.presigned_put_object(
                 match.bucket, match.relative_path, expires=expires
             )
             return url
@@ -599,7 +599,7 @@ class Pyminio:
         raise ValueError("the given path does not corresponds to a directory.")
 
     def get_presigned_delete_object_url(
-        self, path: str, expires=timedelta(hours=PRESIGNED_EXPIRATION_TIME)
+        self, path: str, expires: timedelta = timedelta(hours=PRESIGNED_EXPIRATION_TIME)
     ) -> str:
         """Get presigned URL string to delete the object in the given path with default expiry of two hours.
 
@@ -615,7 +615,7 @@ class Pyminio:
             if match.is_file():
                 details = self.minio_obj.stat_object(match.bucket, match.relative_path)
                 if not details.is_dir:
-                    url = self.minio_obj.get_presigned_url(
+                    url: str = self.minio_obj.get_presigned_url(
                         "DELETE", match.bucket, match.relative_path, expires=expires
                     )
                     return url
