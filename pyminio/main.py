@@ -579,7 +579,7 @@ class Pyminio:
         self,
         to_path: str,
         file_name: str,
-        expires=timedelta(hours=PRESIGNED_EXPIRATION_TIME)
+        expires=timedelta(hours=PRESIGNED_EXPIRATION_TIME),
     ) -> str:
         """Get presigned URL string to upload the object in the given path with default expiry of two hours.
 
