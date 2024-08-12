@@ -57,7 +57,6 @@ class Pyminio:
     # Default expiration time for presigned URLs in hours.
     PRESIGNED_EXPIRATION_TIME = 1
 
-
     def __init__(self, minio_obj: Minio):
         self.minio_obj = minio_obj
 
