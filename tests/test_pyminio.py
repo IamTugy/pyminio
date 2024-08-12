@@ -1,11 +1,13 @@
 from functools import wraps
-from posixpath import join
 from os import makedirs, remove
-from os.path import exists as osexists, join as osjoin
+from os.path import exists as osexists
+from os.path import join as osjoin
+from posixpath import join
+
 from typing import Callable, Dict, Generator, List, Union
 
-import requests
 import pytest
+import requests
 
 from pyminio.exceptions import DirectoryNotEmptyError
 from pyminio.structures import File
@@ -36,7 +38,7 @@ def _mkdirs_recursively(client: PyminioTest, fs: FS_TYPE, relative_path: str) ->
 
 
 def mock_fs(
-        fs: FS_TYPE, relative_path: str = ROOT
+    fs: FS_TYPE, relative_path: str = ROOT
 ) -> Callable[[Callable[[PyminioTest], None]], Callable[[PyminioTest], None]]:
     def decorator(func: Callable[[PyminioTest], None]) -> Callable[[PyminioTest], None]:
         @wraps(func)
@@ -463,7 +465,8 @@ def test_get_presigned_delete_object_url(client: PyminioTest) -> None:
     # Make DELETE request to presigned URL
     response = requests.delete(presigned_url)
     # Check that the DELETE request was successful
-    assert response.status_code == 204  # 204 No Content is typical for a successful DELETE
+    # 204 No Content is typical for a successful DELETE
+    assert (response.status_code == 204)
 
     # Validate that the object has been deleted by trying to get its presigned URL again
     with pytest.raises(Exception):
@@ -506,7 +509,9 @@ def test_presigned_url_put_object(client: PyminioTest) -> None:
     assert response.status_code == 200
 
     # Validate that the object was uploaded by generating a GET URL and checking the content
-    presigned_get_url = client.get_presigned_get_object_url(f"/foo/bar2/{upload_file_name}")
+    presigned_get_url = client.get_presigned_get_object_url(
+        f"/foo/bar2/{upload_file_name}"
+    )
     get_response = requests.get(presigned_get_url)
     # Validate that the GET request was successful
     assert get_response.status_code == 200
