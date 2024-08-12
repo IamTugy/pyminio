@@ -54,8 +54,8 @@ files = [
 cffi = ">=1.0.1"
 
 [package.extras]
-dev = ["cogapp", "pre-commit", "pytest", "wheel", "requests"]
-tests = ["pytest"]
+dev = ["cogapp", "pre-commit", "pytest", "wheel"]
+tests = ["pytest", "requests"]
 
 [[package]]
 name = "certifi"

@@ -562,17 +562,15 @@ class Pyminio:
 
             raise ValueError(f"path {path!r} does not corresponds to a file object.")
 
-        except StopIteration:
-            raise ValueError(
-                f"cannot access {path!r}: "
-                "Invalid path or it does not corresponds to a file object."
-            )
         except S3Error as e:
             if e.code in ["NoSuchKey"]:
                 raise ValueError(
                     f"cannot access {path!r}: "
                     "Invalid path or it does not corresponds to a file object."
                 )
+            raise
+        except Exception:
+            raise
 
     def get_presigned_put_object_url(
         self,
@@ -622,14 +620,12 @@ class Pyminio:
 
             raise ValueError(f"path {path!r} does not corresponds to a file object.")
 
-        except StopIteration:
-            raise ValueError(
-                f"cannot access {path!r}: "
-                "Invalid path or it does not corresponds to a file object."
-            )
         except S3Error as e:
             if e.code in ["NoSuchKey"]:
                 raise ValueError(
                     f"cannot access {path!r}: "
                     "Invalid path or it does not corresponds to a file object."
                 )
+            raise
+        except Exception:
+            raise
