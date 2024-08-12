@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass
 from functools import cached_property
-from os.path import join
+from posixpath import join
 from typing import Any, Dict
 
 ROOT = "/"

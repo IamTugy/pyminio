@@ -1,9 +1,8 @@
 from collections import deque
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from io import BytesIO
-from os.path import basename, join, normpath
-from posixpath import dirname
+from posixpath import basename, dirname, join, normpath
 from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, TypeVar, Union
 
 from minio import Minio, datatypes
@@ -54,6 +53,9 @@ def get_creation_date(obj: datatypes.Bucket) -> datetime:
 
 class Pyminio:
     """Pyminio is an os-like cover to minio."""
+
+    # Default expiration time for presigned URLs in hours.
+    PRESIGNED_EXPIRATION_TIME = 1
 
     def __init__(self, minio_obj: Minio):
         self.minio_obj = minio_obj
@@ -535,3 +537,95 @@ class Pyminio:
         new_path = join(ROOT, match.bucket, relative_path)
 
         return self.get(new_path)
+
+    def get_presigned_get_object_url(
+        self, path: str, expires: timedelta = timedelta(hours=PRESIGNED_EXPIRATION_TIME)
+    ) -> str:
+        """Get presigned URL string to download the object in the given path with default expiry of two hours.
+
+        Args:
+            path: path of a file.
+            expires: time for the presigned url to expire.
+        """
+        match = Match(path)
+
+        if match.is_bucket():
+            raise ValueError("Minio bucket has no representable object.")
+        try:
+            if match.is_file():
+                details = self.minio_obj.stat_object(match.bucket, match.relative_path)
+                if not details.is_dir:
+                    url: str = self.minio_obj.presigned_get_object(
+                        match.bucket, match.relative_path, expires=expires
+                    )
+                    return url
+
+            raise ValueError(f"path {path!r} does not corresponds to a file object.")
+
+        except S3Error as e:
+            if e.code in ["NoSuchKey"]:
+                raise ValueError(
+                    f"cannot access {path!r}: "
+                    "Invalid path or it does not corresponds to a file object."
+                )
+            raise
+        except Exception:
+            raise
+
+    def get_presigned_put_object_url(
+        self,
+        to_path: str,
+        file_name: str,
+        expires: timedelta = timedelta(hours=PRESIGNED_EXPIRATION_TIME),
+    ) -> str:
+        """Get presigned URL string to upload the object in the given path with default expiry of two hours.
+
+        Args:
+            to_path: path of a file.
+            file_name: object name to upload.
+            expires: time for the presigned url to expire.
+        """
+        match = Match(to_path)
+
+        if match.is_dir():
+            match = Match(join(to_path, basename(file_name)))
+            url: str = self.minio_obj.presigned_put_object(
+                match.bucket, match.relative_path, expires=expires
+            )
+            return url
+
+        raise ValueError("the given path does not corresponds to a directory.")
+
+    def get_presigned_delete_object_url(
+        self, path: str, expires: timedelta = timedelta(hours=PRESIGNED_EXPIRATION_TIME)
+    ) -> str:
+        """Get presigned URL string to delete the object in the given path with default expiry of two hours.
+
+        Args:
+            path: path of a file.
+            expires: time for the presigned url to expire.
+        """
+        match = Match(path)
+
+        if match.is_bucket():
+            raise ValueError("Minio bucket has no representable object.")
+        try:
+            if match.is_file():
+                details = self.minio_obj.stat_object(match.bucket, match.relative_path)
+                if not details.is_dir:
+                    url: str = self.minio_obj.get_presigned_url(
+                        "DELETE", match.bucket, match.relative_path, expires=expires
+                    )
+                    return url
+
+            raise ValueError(f"path {path!r} does not corresponds to a file object.")
+
+        except S3Error as e:
+            if e.code in ["NoSuchKey"]:
+                raise ValueError(
+                    f"cannot access {path!r}: "
+                    "Invalid path or it does not corresponds to a file object."
+                )
+            raise
+        except Exception:
+            raise
