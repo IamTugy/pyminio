@@ -3,7 +3,6 @@ from os import makedirs, remove
 from os.path import exists as osexists
 from os.path import join as osjoin
 from posixpath import join
-
 from typing import Callable, Dict, Generator, List, Union
 
 import pytest
