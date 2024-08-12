@@ -466,7 +466,7 @@ def test_get_presigned_delete_object_url(client: PyminioTest) -> None:
     response = requests.delete(presigned_url)
     # Check that the DELETE request was successful
     # 204 No Content is typical for a successful DELETE
-    assert (response.status_code == 204)
+    assert response.status_code == 204
 
     # Validate that the object has been deleted by trying to get its presigned URL again
     with pytest.raises(Exception):

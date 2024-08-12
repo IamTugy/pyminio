@@ -540,7 +540,7 @@ class Pyminio:
         return self.get(new_path)
 
     def get_presigned_get_object_url(
-            self, path: str, expires=timedelta(hours=PRESIGNED_EXPIRATION_TIME)
+        self, path: str, expires=timedelta(hours=PRESIGNED_EXPIRATION_TIME)
     ) -> str:
         """Get presigned URL string to download the object in the given path with default expiry of two hours.
 
@@ -565,18 +565,21 @@ class Pyminio:
 
         except StopIteration:
             raise ValueError(
-                f"cannot access {path!r}: " 
+                f"cannot access {path!r}: "
                 "Invalid path or it does not corresponds to a file object."
             )
         except S3Error as e:
             if e.code in ["NoSuchKey"]:
                 raise ValueError(
-                    f"cannot access {path!r}: " 
+                    f"cannot access {path!r}: "
                     "Invalid path or it does not corresponds to a file object."
                 )
 
     def get_presigned_put_object_url(
-            self, to_path: str, file_name: str, expires=timedelta(hours=PRESIGNED_EXPIRATION_TIME)
+        self,
+        to_path: str,
+        file_name: str,
+        expires=timedelta(hours=PRESIGNED_EXPIRATION_TIME)
     ) -> str:
         """Get presigned URL string to upload the object in the given path with default expiry of two hours.
 
@@ -597,7 +600,7 @@ class Pyminio:
         raise ValueError("the given path does not corresponds to a directory.")
 
     def get_presigned_delete_object_url(
-            self, path: str, expires=timedelta(hours=PRESIGNED_EXPIRATION_TIME)
+        self, path: str, expires=timedelta(hours=PRESIGNED_EXPIRATION_TIME)
     ) -> str:
         """Get presigned URL string to delete the object in the given path with default expiry of two hours.
 
@@ -622,12 +625,12 @@ class Pyminio:
 
         except StopIteration:
             raise ValueError(
-                f"cannot access {path!r}: " 
+                f"cannot access {path!r}: "
                 "Invalid path or it does not corresponds to a file object."
             )
         except S3Error as e:
             if e.code in ["NoSuchKey"]:
                 raise ValueError(
-                    f"cannot access {path!r}: " 
+                    f"cannot access {path!r}: "
                     "Invalid path or it does not corresponds to a file object."
                 )
