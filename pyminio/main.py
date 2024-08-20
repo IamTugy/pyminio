@@ -2,8 +2,7 @@ from collections import deque
 from datetime import datetime, timezone
 from functools import wraps
 from io import BytesIO
-from os.path import basename, join, normpath
-from posixpath import dirname
+from posixpath import basename, dirname, join, normpath
 from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, TypeVar, Union
 
 from minio import Minio, datatypes
